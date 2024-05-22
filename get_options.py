@@ -8,7 +8,7 @@ engine = create_engine(connection_string)
 def get_lookup_option(lookup_ids, to_lower=False):
     if not hasattr(get_lookup_option, 'lookup_options'):
         options = pd.read_sql_query(
-            "SELECT ln.type_id, lo.option_id, lo.option_value FROM lookup_name ln "
+            "SELECT ln.type_id, lo.option_id, lo.option_value FROM tbl_sir_lookup_name ln "
             "INNER JOIN tbl_sir_lookup_options lo ON ln.lookup_id = lo.lookup_id "
             "WHERE ln.type_id IN %(lookup_ids)s AND lo.option_status = 1",
             con=engine,

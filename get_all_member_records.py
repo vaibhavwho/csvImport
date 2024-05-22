@@ -53,8 +53,8 @@ def get_dependents_member_details(client_id, ssn_list, match_type, enrollment_ty
                  ELSE '' END AS subscriber_type,  
             CONCAT_WS(' ', dependent_first_name, dependent_last_name) as member_name 
         FROM 
-            EmployeeDependents td 
-            LEFT JOIN Subscribers ts ON ts.unique_member_id = td.employee_id AND ts.client_id = {client_id}
+            tbl_ph_employee_dependents td 
+            LEFT JOIN tbl_ph_subscribers ts ON ts.unique_member_id = td.employee_id AND ts.client_id = {client_id}
             INNER JOIN tbl_sir_lookup_options lo ON lo.option_id = td.dependent_relation_ship AND lo.option_type = 12
         WHERE 
             td.client_id = {client_id} {filter_dependent}

@@ -2,7 +2,7 @@ import os
 import pdb
 import re
 import time
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, g
 from pathlib import Path
 import pandas as pd
 import pandera as pa
@@ -13,14 +13,14 @@ from dask import dataframe as dd
 from dask.distributed import Client, LocalCluster
 import dask
 from constants import SERVICE_TYPE
-from schema import schema
+from custom_dataframe_schema import create_schema
 from get_all_member_records import get_all_members_records
 from get_info import get_employer_dataframe, get_provider_dataframe
 from get_options import get_lookup_option, get_diagnostic_code_list, get_provider_code_list_upload, \
     get_procedure_code_list, get_benefit_code_list_array
 
 
-def validate_chunk(chunk, start_index):
+def validate_chunk(schema, chunk, start_index):
     print(f"Process {os.getpid()} started for chunk.")
     errors = []
     try:
@@ -47,7 +47,9 @@ def create_app():
         request_data = request.json
         file_path = request_data.get('file_path')
         client_id = request_data.get('client_id')
+        user_id = request_data.get('user_id')
         type = request_data.get('type')
+        schema = create_schema(user_id, client_id)
 
         if not file_path:
             return jsonify({"error": "File path not provided"}), 400
@@ -142,11 +144,12 @@ def create_app():
             records = get_all_members_records(client_id, members_ids, True)
 
 
-            # get_lookup_option([SERVICE_TYPE, 12, 13, 14, 16, 20], True)
-            # get_diagnostic_code_list()
-            # get_provider_code_list_upload(provider_ids)
-            # get_procedure_code_list()
-            # get_benefit_code_list_array()
+            # lookup_options = get_lookup_option([SERVICE_TYPE, 12, 13, 14, 16, 20], True)
+            # diagnostic_code_list = get_diagnostic_code_list()
+            # provider_code_list = get_provider_code_list_upload(provider_ids)
+            # procedure_code_list = get_procedure_code_list()
+            # benefit_code_list = get_benefit_code_list_array()
+
             print("Converting Dask DataFrame to Pandas DataFrames for validation...")
 
             # ddf = ddf.map_partitions(preprocess_date_columns, meta=meta)
@@ -156,7 +159,7 @@ def create_app():
             all_errors = []
 
             def process_partition(partition, start_idx):
-                df_errors = validate_chunk(partition, start_idx)
+                df_errors = validate_chunk(schema, partition, start_idx)
                 return df_errors
             partitions = ddf.to_delayed()
             futures = [dask.delayed(process_partition)(partition, start_indices[i]) for i, partition in enumerate(partitions)]
