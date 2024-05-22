@@ -32,9 +32,9 @@ def check_date_format(date_series):
     return date_series.apply(lambda x: is_valid_date(x) if pd.notnull(x) else True)
 
 
-provider_df = get_provider_dataframe()
-provider_number_list = provider_df['provider_number'].astype(int).tolist()
-print(provider_number_list)
+# provider_df = get_provider_dataframe()
+# provider_number_list = provider_df['provider_number'].astype(int).tolist()
+# print(provider_number_list)
 
 
 # Define the schema

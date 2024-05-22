@@ -9,7 +9,7 @@ def get_employer_dataframe(client_id: int) -> pd.DataFrame:
 
     query = "SELECT employer_id FROM tbl_ph_employer_info WHERE client_id = {}".format(client_id)
     engine = create_engine(connection_string)
-    employer_df = pd.read_sql_query(query, con=engine, index_col='id')
+    employer_df = pd.read_sql_query(query, con=engine)
     return employer_df
 
 

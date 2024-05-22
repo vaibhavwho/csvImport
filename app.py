@@ -129,16 +129,24 @@ def create_app():
                 # date_format=parse_date,
                 blocksize=20e6
             )
-            # members_ids = ddf['UNIQUE_PATIENT_ID'].astype(str).unique().compute().tolist()
-            # provider_ids = ddf['PROVIDER_NPI'].astype(str).unique().compute().tolist()
+
+            # Getting unique patient ids and provider npi\'s from csv
+            members_ids = ddf['UNIQUE_PATIENT_ID'].astype(str).unique().compute().tolist()
+            provider_ids = ddf['PROVIDER_NPI'].astype(str).unique().compute().tolist()
+
+            # Getting employer and provider list
+            employer_df = get_employer_dataframe(client_id)
+            provider_df = get_provider_dataframe()
+            employer_id_list = employer_df['employer_id'].tolist()
+            provider_number_list = provider_df['provider_number'].astype(int).tolist()
+
+
+            # get_all_members_records(client_id, members_ids, True)
             # get_lookup_option([SERVICE_TYPE, 12, 13, 14, 16, 20], True)
             # get_diagnostic_code_list()
             # get_provider_code_list_upload(provider_ids)
             # get_procedure_code_list()
             # get_benefit_code_list_array()
-            # employer_df = get_employer_dataframe(client_id)
-            # get_all_members_records(client_id, members_ids, True)
-
             print("Converting Dask DataFrame to Pandas DataFrames for validation...")
 
             # ddf = ddf.map_partitions(preprocess_date_columns, meta=meta)
