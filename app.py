@@ -12,7 +12,12 @@ import concurrent.futures
 from dask import dataframe as dd
 from dask.distributed import Client, LocalCluster
 import dask
+from constants import SERVICE_TYPE
 from dataframeSchema import schema
+from getAllMemberRecords import get_all_members_records
+from getInfo import get_employer_dataframe, get_provider_dataframe
+from getOptions import get_lookup_option, get_diagnostic_code_list, get_provider_code_list_upload, \
+    get_procedure_code_list, get_benefit_code_list_array
 
 
 def validate_chunk(chunk, start_index):
@@ -32,21 +37,17 @@ def validate_chunk(chunk, start_index):
     print(f"Process {os.getpid()} finished for chunk.")
     return errors
 
-# def to_float(value):
-#     try:
-#         return float(value)
-#     except (ValueError, TypeError) as e:
-#         return f"Error: {value} - {str(e)}"
-
 
 def create_app():
     app = Flask(__name__)
 
-    @app.route('/validate_csv', methods=['POST'])
+    @app.route('/process_file', methods=['POST'])
     def validate_csv():
         start_time = time.time()
         request_data = request.json
         file_path = request_data.get('file_path')
+        client_id = request_data.get('client_id')
+        type = request_data.get('type')
 
         if not file_path:
             return jsonify({"error": "File path not provided"}), 400
@@ -128,75 +129,15 @@ def create_app():
                 # date_format=parse_date,
                 blocksize=20e6
             )
-
-            ## For preprocessing date
-            # def preprocess_date_columns(df):
-            #     for col in ['SERVICE_START_DATE', 'SERVICE_END_DATE', 'CLAIM_PAID_DATE']:
-            #         df[col] = df[col].astype(str).str.strip()
-            #         df[col] = pd.to_datetime(df[col], errors='coerce')
-            #     return df
-            #
-            # meta = {
-            #     'EMPLOYER_ID': 'category',
-            #     'EMPLOYER_NAME': 'category',
-            #     'CLAIM_STATUS': 'category',
-            #     'CLAIM_TYPE': 'category',
-            #     'SERVICE_START_DATE': 'datetime64[ns]',
-            #     'SERVICE_END_DATE': 'datetime64[ns]',
-            #     'PROVIDER_NPI': 'category',
-            #     'PLACE_OF_SERVICE': 'category',
-            #     'CPT_PROCEDURE': 'category',
-            #     'DIAGNOSIS_1': 'category',
-            #     'CLAIM_PAID_DATE': 'datetime64[ns]',
-            #     'COVERED_AMOUNT': 'float64',
-            #     'PLAN_PAID_AMOUNT': 'category',
-            #     'PATIENT_SSN': 'category',
-            #     'INPATIENT_OR_OUTPATIENT': 'category',
-            #     'CLAIM_CAUSE': 'category',
-            #     'BENEFIT_CODE': 'category',
-            #     'NETWORK': 'category',
-            #     'PROVIDER_NAME': 'category',
-            #     'PROVIDER_PAID_NAME': 'category',
-            #     'CHARGED_AMOUNT': 'float64',
-            #     'UCR': 'category',
-            #     'CPT_MODIFIER': 'category',
-            #     'DIAGNOSIS_2': 'category',
-            #     'DIAGNOSIS_3': 'category',
-            #     'DIAGNOSIS_4': 'category',
-            #     'DIAGNOSIS_5': 'category',
-            #     'MEMBER_DEDUCTIBLE_AMOUNT': 'float64',
-            #     'MEMBER_OOP_AMOUNT': 'float64',
-            #     'MEMBER_COPAY_AMOUNT': 'float64',
-            #     'CLAIM_NUMBER': 'category',
-            #     'CLAIM_RECEIVED_DATE': 'category',
-            #     'CLAIM_ENTRY_DATE': 'category',
-            #     'REMARKS_CODE_1': 'category',
-            #     'REMARKS_CODE_2': 'category',
-            #     'REMARKS_CODE_3': 'category',
-            #     'CHECK_NUMBER': 'category',
-            #     'BENEFITS_ASSIGNED': 'category',
-            #     'REVENUE_CODE': 'category',
-            #     'PROVIDER_EIN': 'category',
-            #     'PROVIDER_PAID_NPI': 'category',
-            #     'PROVIDER_PAID_ZIP': 'category',
-            #     'UNIQUE_PATIENT_ID': 'category',
-            #     'LOCATION_CODE': 'category',
-            #     'SUB_GROUP_CODE': 'category',
-            #     'PLAN_CODE': 'category',
-            #     'ADMIT_DATE': 'category',
-            #     'DISCHARGE_DATE': 'category',
-            #     'ADMISSION_DAYS': 'category',
-            #     'DISCHARGE_STATUS_CODE': 'category',
-            #     'POINT_OF_ORIGIN_CODE': 'category',
-            #     'ADMISSION_DIAGNOSIS_CODE': 'category',
-            #     'PATIENT_REASON_DIAGNOSIS_CODE': 'category',
-            #     'CLAIM_FORM_TYPE': 'category',
-            #     'TYPE_OF_BILL_CODE': 'category',
-            #     'ORIGINAL_PROCEDURE_CODE': 'category',
-            #     'ORIGINAL_POS_CODE': 'category',
-            #     'ORIGINAL_DIAGNOSIS_CODE': 'category',
-            #     'ORIGINAL_PROVIDER_CODE': 'category'
-            # }
+            # members_ids = ddf['UNIQUE_PATIENT_ID'].astype(str).unique().compute().tolist()
+            # provider_ids = ddf['PROVIDER_NPI'].astype(str).unique().compute().tolist()
+            # get_lookup_option([SERVICE_TYPE, 12, 13, 14, 16, 20], True)
+            # get_diagnostic_code_list()
+            # get_provider_code_list_upload(provider_ids)
+            # get_procedure_code_list()
+            # get_benefit_code_list_array()
+            # employer_df = get_employer_dataframe(client_id)
+            # get_all_members_records(client_id, members_ids, True)
 
             print("Converting Dask DataFrame to Pandas DataFrames for validation...")
 

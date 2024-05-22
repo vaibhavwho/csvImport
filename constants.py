@@ -10,6 +10,7 @@ CLAIM_STATUS = [
     ('Z', 'Pended Claim'),
     ('P', 'Closed'),
 ]
+
 CLAIM_TYPE = {
     'M': 'Medical',
     'D': 'Dental',
@@ -17,8 +18,11 @@ CLAIM_TYPE = {
     'H': 'HRA',
     'O': 'Other'
 }
+
 INPATIENT_OR_OUTPATIENT = {
     'I': 'Inpatient',
     'O': 'Outpatient',
     'E': 'Emergency'
 }
+
+SERVICE_TYPE = 15

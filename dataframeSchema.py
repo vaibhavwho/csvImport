@@ -1,51 +1,14 @@
 import pdb
 import re
-
 import pandas as pd
 import pandera as pa
 from pandera import DataFrameSchema, Column, Check
 from constants import CLAIM_STATUS, CLAIM_TYPE, INPATIENT_OR_OUTPATIENT
+from getInfo import get_employer_dataframe, get_provider_dataframe
 
-# # For float values validation
-
-# check_positive_float = Check(lambda x: re.match(r'^[a-zA-Z0-9_ ]*$', str(x)) if not float(x) else x > 0)
-# check_positive_float = Check(lambda x: bool(re.match(r'^\d*\.?\d+$', str(x))), error="Non-numerical value found")
-
-# # For validation of date format
-
-# def date_format_parser(series: pd.Series) -> pd.Series:
-#     def parse_date(date_string):
-#         if isinstance(date_string, str):
-#             if '/' in date_string:
-#                 return pd.to_datetime(date_string, format='%m/%d/%Y', errors='coerce')
-#             elif '-' in date_string:
-#                 date_string = date_string.replace("-", "/")
-#                 return pd.to_datetime(date_string, format='%m/%d/%Y', errors='coerce')
-#         return pd.NaT
-#
-#     parsed_dates = series.apply(parse_date)
-#     return ~parsed_dates.isna()
-
-
-# def parse_date(date_series):
-#     def try_parsing_date(date_string):
-#         for fmt in ('%m/%d/%Y', '%Y-%m-%d', '%d-%b-%y'):
-#             try:
-#                 return pd.to_datetime(date_string, format=fmt, errors='coerce')
-#             except ValueError:
-#                 pass
-#         return pd.NaT
-#
-#     return date_series.apply(try_parsing_date)
-
-# def valid_date_format(date_string):
-#     pattern = r'^\d{2}/\d{2}/\d{4}$|^\d{4}-\d{2}-\d{2}$|^\d{2}-[a-zA-Z]{3}-\d{2}$'
-#     return bool(re.match(pattern, date_string))
-
-# date_pattern = re.compile(r'^\d{2}/\d{2}/\d{4}$|^\d{2}-\d{2}-\d{4}$')
-# def check_date_format(date_series):
-#     return date_series.apply(lambda x: bool(date_pattern.match(x)) if pd.notnull(x) else True)
 basic_date_pattern = re.compile(r'^(0[1-9]|1[0-2])[-/](0[1-9]|[12][0-9]|3[01])[-/](\d{4})$')
+
+
 def is_valid_date(date_str):
     if not basic_date_pattern.match(date_str):
         return False
@@ -69,6 +32,11 @@ def check_date_format(date_series):
     return date_series.apply(lambda x: is_valid_date(x) if pd.notnull(x) else True)
 
 
+provider_df = get_provider_dataframe()
+provider_number_list = provider_df['provider_number'].astype(int).tolist()
+print(provider_number_list)
+
+
 # Define the schema
 schema = DataFrameSchema(
     {
@@ -82,9 +50,9 @@ schema = DataFrameSchema(
         "PLACE_OF_SERVICE": Column(pa.String, checks=[pa.Check.str_matches(r'^[a-zA-Z0-9_]+$')], nullable=True),
         "CPT_PROCEDURE": Column(pa.String, checks=[pa.Check.str_matches(r'^[a-zA-Z0-9_]+$')], nullable=True),
         "DIAGNOSIS_1": Column(pa.String, checks=[pa.Check.str_matches(r'^[a-zA-Z0-9_]+$')], nullable=True),
-        "CLAIM_PAID_DATE": Column(pa.String, checks=[pa.Check(check_date_format, element_wise=False)], nullable=True),
+        "CLAIM_PAID_DATE": Column(pa.String, checks=[pa.Check(check_date_format, element_wise=False)], nullable=False),
         "COVERED_AMOUNT": Column(pa.Float, checks=[pa.Check(lambda x: x >= 0)], nullable=True),
-        "PLAN_PAID_AMOUNT": Column(pa.String, checks=[pa.Check.str_matches(r'^(\d+(\.\d*)?|\.\d+)$')], nullable=True),
+        "PLAN_PAID_AMOUNT": Column(pa.String, checks=[pa.Check.str_matches(r'^(\d+(\.\d*)?|\.\d+)$')], nullable=False),
         "PATIENT_SSN": Column(pa.String, checks=[pa.Check.str_matches(r'^[a-zA-Z0-9_]+$')], nullable=True),
         "INPATIENT_OR_OUTPATIENT": Column(pa.String, checks=[pa.Check.isin(list(INPATIENT_OR_OUTPATIENT.keys()))], nullable=True),
         "CLAIM_CAUSE": Column(pa.String, checks=[pa.Check.str_matches(r'^[a-zA-Z0-9_]+$')], nullable=True),

@@ -1,0 +1,110 @@
+            ## For preprocessing date
+            # def preprocess_date_columns(df):
+            #     for col in ['SERVICE_START_DATE', 'SERVICE_END_DATE', 'CLAIM_PAID_DATE']:
+            #         df[col] = df[col].astype(str).str.strip()
+            #         df[col] = pd.to_datetime(df[col], errors='coerce')
+            #     return df
+            #
+            # meta = {
+            #     'EMPLOYER_ID': 'category',
+            #     'EMPLOYER_NAME': 'category',
+            #     'CLAIM_STATUS': 'category',
+            #     'CLAIM_TYPE': 'category',
+            #     'SERVICE_START_DATE': 'datetime64[ns]',
+            #     'SERVICE_END_DATE': 'datetime64[ns]',
+            #     'PROVIDER_NPI': 'category',
+            #     'PLACE_OF_SERVICE': 'category',
+            #     'CPT_PROCEDURE': 'category',
+            #     'DIAGNOSIS_1': 'category',
+            #     'CLAIM_PAID_DATE': 'datetime64[ns]',
+            #     'COVERED_AMOUNT': 'float64',
+            #     'PLAN_PAID_AMOUNT': 'category',
+            #     'PATIENT_SSN': 'category',
+            #     'INPATIENT_OR_OUTPATIENT': 'category',
+            #     'CLAIM_CAUSE': 'category',
+            #     'BENEFIT_CODE': 'category',
+            #     'NETWORK': 'category',
+            #     'PROVIDER_NAME': 'category',
+            #     'PROVIDER_PAID_NAME': 'category',
+            #     'CHARGED_AMOUNT': 'float64',
+            #     'UCR': 'category',
+            #     'CPT_MODIFIER': 'category',
+            #     'DIAGNOSIS_2': 'category',
+            #     'DIAGNOSIS_3': 'category',
+            #     'DIAGNOSIS_4': 'category',
+            #     'DIAGNOSIS_5': 'category',
+            #     'MEMBER_DEDUCTIBLE_AMOUNT': 'float64',
+            #     'MEMBER_OOP_AMOUNT': 'float64',
+            #     'MEMBER_COPAY_AMOUNT': 'float64',
+            #     'CLAIM_NUMBER': 'category',
+            #     'CLAIM_RECEIVED_DATE': 'category',
+            #     'CLAIM_ENTRY_DATE': 'category',
+            #     'REMARKS_CODE_1': 'category',
+            #     'REMARKS_CODE_2': 'category',
+            #     'REMARKS_CODE_3': 'category',
+            #     'CHECK_NUMBER': 'category',
+            #     'BENEFITS_ASSIGNED': 'category',
+            #     'REVENUE_CODE': 'category',
+            #     'PROVIDER_EIN': 'category',
+            #     'PROVIDER_PAID_NPI': 'category',
+            #     'PROVIDER_PAID_ZIP': 'category',
+            #     'UNIQUE_PATIENT_ID': 'category',
+            #     'LOCATION_CODE': 'category',
+            #     'SUB_GROUP_CODE': 'category',
+            #     'PLAN_CODE': 'category',
+            #     'ADMIT_DATE': 'category',
+            #     'DISCHARGE_DATE': 'category',
+            #     'ADMISSION_DAYS': 'category',
+            #     'DISCHARGE_STATUS_CODE': 'category',
+            #     'POINT_OF_ORIGIN_CODE': 'category',
+            #     'ADMISSION_DIAGNOSIS_CODE': 'category',
+            #     'PATIENT_REASON_DIAGNOSIS_CODE': 'category',
+            #     'CLAIM_FORM_TYPE': 'category',
+            #     'TYPE_OF_BILL_CODE': 'category',
+            #     'ORIGINAL_PROCEDURE_CODE': 'category',
+            #     'ORIGINAL_POS_CODE': 'category',
+            #     'ORIGINAL_DIAGNOSIS_CODE': 'category',
+            #     'ORIGINAL_PROVIDER_CODE': 'category'
+            # }
+
+
+
+# # For float values validation
+
+# check_positive_float = Check(lambda x: re.match(r'^[a-zA-Z0-9_ ]*$', str(x)) if not float(x) else x > 0)
+# check_positive_float = Check(lambda x: bool(re.match(r'^\d*\.?\d+$', str(x))), error="Non-numerical value found")
+
+# # For validation of date format
+
+# def date_format_parser(series: pd.Series) -> pd.Series:
+#     def parse_date(date_string):
+#         if isinstance(date_string, str):
+#             if '/' in date_string:
+#                 return pd.to_datetime(date_string, format='%m/%d/%Y', errors='coerce')
+#             elif '-' in date_string:
+#                 date_string = date_string.replace("-", "/")
+#                 return pd.to_datetime(date_string, format='%m/%d/%Y', errors='coerce')
+#         return pd.NaT
+#
+#     parsed_dates = series.apply(parse_date)
+#     return ~parsed_dates.isna()
+
+
+# def parse_date(date_series):
+#     def try_parsing_date(date_string):
+#         for fmt in ('%m/%d/%Y', '%Y-%m-%d', '%d-%b-%y'):
+#             try:
+#                 return pd.to_datetime(date_string, format=fmt, errors='coerce')
+#             except ValueError:
+#                 pass
+#         return pd.NaT
+#
+#     return date_series.apply(try_parsing_date)
+
+# def valid_date_format(date_string):
+#     pattern = r'^\d{2}/\d{2}/\d{4}$|^\d{4}-\d{2}-\d{2}$|^\d{2}-[a-zA-Z]{3}-\d{2}$'
+#     return bool(re.match(pattern, date_string))
+
+# date_pattern = re.compile(r'^\d{2}/\d{2}/\d{4}$|^\d{2}-\d{2}-\d{4}$')
+# def check_date_format(date_series):
+#     return date_series.apply(lambda x: bool(date_pattern.match(x)) if pd.notnull(x) else True)
