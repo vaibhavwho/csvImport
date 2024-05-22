@@ -13,10 +13,10 @@ from dask import dataframe as dd
 from dask.distributed import Client, LocalCluster
 import dask
 from constants import SERVICE_TYPE
-from dataframeSchema import schema
-from getAllMemberRecords import get_all_members_records
-from getInfo import get_employer_dataframe, get_provider_dataframe
-from getOptions import get_lookup_option, get_diagnostic_code_list, get_provider_code_list_upload, \
+from schema import schema
+from get_all_member_records import get_all_members_records
+from get_info import get_employer_dataframe, get_provider_dataframe
+from get_options import get_lookup_option, get_diagnostic_code_list, get_provider_code_list_upload, \
     get_procedure_code_list, get_benefit_code_list_array
 
 

@@ -4,7 +4,7 @@ import pandas as pd
 import pandera as pa
 from pandera import DataFrameSchema, Column, Check
 from constants import CLAIM_STATUS, CLAIM_TYPE, INPATIENT_OR_OUTPATIENT
-from getInfo import get_employer_dataframe, get_provider_dataframe
+from get_info import get_employer_dataframe, get_provider_dataframe
 
 basic_date_pattern = re.compile(r'^(0[1-9]|1[0-2])[-/](0[1-9]|[12][0-9]|3[01])[-/](\d{4})$')
 
