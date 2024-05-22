@@ -1,7 +1,7 @@
 import pandas as pd
 from sqlalchemy import create_engine
+from constants import connection_string
 
-connection_string = 'mysql+pymysql://root:@localhost/sir'
 engine = create_engine(connection_string)
 
 

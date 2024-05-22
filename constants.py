@@ -1,3 +1,5 @@
+connection_string = 'mysql+pymysql://root:@localhost/sir'
+
 CLAIM_STATUS = [
     ('A', 'Void of a coordination of benefits adjustment'),
     ('B', 'Coordination of Benefits'),
@@ -26,3 +28,17 @@ INPATIENT_OR_OUTPATIENT = {
 }
 
 SERVICE_TYPE = 15
+
+SSNTRIGGER = 'ssn_trigger'
+CONDITIONS = 'condition'
+PROCEDURES = 'procedure'
+PROVIDERS = 'provider'
+MEMBERS = 'member'
+LOADDATA = 'loadData'
+
+isMajorCategory = 'MAJOR CATEGORY'
+isSubDiagnosis = 'SUBDIAGNOSIS'
+isChronic = 'CHRONIC CONDITIONS'
+isTriggerDiagnosis = 'TRIGGER DIAGNOSIS'
+IN_DB_CONDITION = True
+

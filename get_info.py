@@ -2,7 +2,7 @@ import pandas as pd
 from sqlalchemy import create_engine
 import dask.dataframe as dd
 
-connection_string = 'mysql+pymysql://root:@localhost/sir'
+from constants import connection_string
 
 
 def get_employer_dataframe(client_id: int) -> pd.DataFrame:

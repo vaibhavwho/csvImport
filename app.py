@@ -139,9 +139,9 @@ def create_app():
             provider_df = get_provider_dataframe()
             employer_id_list = employer_df['employer_id'].tolist()
             provider_number_list = provider_df['provider_number'].astype(int).tolist()
+            records = get_all_members_records(client_id, members_ids, True)
 
 
-            # get_all_members_records(client_id, members_ids, True)
             # get_lookup_option([SERVICE_TYPE, 12, 13, 14, 16, 20], True)
             # get_diagnostic_code_list()
             # get_provider_code_list_upload(provider_ids)
