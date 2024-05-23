@@ -152,25 +152,23 @@ def create_app():
             # Getting employer and provider list
             employer_df = get_employer_dataframe(client_id)
             provider_df = get_provider_dataframe()
-            # employer_id_list = employer_df['employer_id'].tolist()
-            # provider_number_list = provider_df['provider_number'].astype(int).tolist()
-            # records = get_all_members_records(client_id, members_ids, True)
+            employer_id_list = employer_df['employer_id'].tolist()
+            provider_number_list = provider_df['provider_number'].astype(int).tolist()
+            records = get_all_members_records(client_id, members_ids, True)
 
-
-            # lookup_options = get_lookup_option([SERVICE_TYPE, 12, 13, 14, 16, 20], True)
-            # diagnostic_code_list = get_diagnostic_code_list()
-            # provider_code_list = get_provider_code_list_upload(provider_ids)
-            # procedure_code_list = get_procedure_code_list()
-            # benefit_code_list = get_benefit_code_list_array()
-
+            lookup_options = get_lookup_option([SERVICE_TYPE, 12, 13, 14, 16, 20], True)
+            diagnostic_code_list = get_diagnostic_code_list()
+            provider_code_list = get_provider_code_list_upload(provider_ids)
+            procedure_code_list = get_procedure_code_list()
+            benefit_code_list = get_benefit_code_list_array()
             print("Converting Dask DataFrame to Pandas DataFrames for validation...")
-
             # ddf = ddf.map_partitions(preprocess_date_columns, meta=meta)
             partition_lengths = ddf.map_partitions(len).compute()
             start_indices = [sum(partition_lengths[:i]) for i in range(len(partition_lengths))]
             print(start_indices)
             all_errors = []
             generated_records = []
+
             def process_partition(partition, start_idx):
                 validated_records_df, df_errors, error_records_df = validate_chunk(schema, partition, start_idx)
                 return {'validated_records_df': validated_records_df, 'df_errors': df_errors, 'error_records_df': error_records_df}

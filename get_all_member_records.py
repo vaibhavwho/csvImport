@@ -1,17 +1,12 @@
-import random
 import pandas as pd
 from sqlalchemy import create_engine
-import time
-from datetime import datetime, timedelta
 from constants import connection_string
 from save_filter import save_filter_array
 
-
 engine = create_engine(connection_string)
 
-# Global variables to hold records and SSNs
-global enrollment_type_change
 db_dependents_member_records = {}
+db_primary_member_records = {}
 dependent_member_ssns = []
 
 
@@ -83,20 +78,24 @@ def index_and_merge_data(data_dependent):
 
 
 def get_primary_member_details(client_id, ssn_list, match_type, enrollment_type_change):
-    global db_dependents_member_records
+    global db_primary_member_records
 
     if not isinstance(ssn_list, list):
         ssn_list = [ssn_list]
 
+    # filter_str = ''
+    # if ssn_list:
+    #     ssn_query = save_filter_array(ssn_list, 'ssn_trigger', [], client_id)
+    #     if enrollment_type_change == 'grid':
+    #         filter_str = f"AND id IN ({ssn_query})"
+    #     else:
+    #         filter_str = f"AND {match_type} IN ({ssn_query})"
+
     filter_str = ''
     if ssn_list:
         ssn_query = save_filter_array(ssn_list, 'ssn_trigger', [], client_id)
-        if enrollment_type_change == 'grid':
-            filter_str = f"AND id IN ({ssn_query})"
-        else:
-            filter_str = f"AND {match_type} IN ({ssn_query})"
+        filter_str = f"AND {match_type} IN ({ssn_query})"
 
-    # Execute SQL query to get primary member details
     sql = f"""
         SELECT 
             id, 
@@ -121,15 +120,16 @@ def get_primary_member_details(client_id, ssn_list, match_type, enrollment_type_
         WHERE 
             client_id = {client_id} {filter_str}
     """
+
     data_primary = pd.read_sql_query(sql, con=engine)
 
-    merged_records, merged_ssns = index_and_merge_data(data_primary)
-
-    return merged_records, merged_ssns
+    indexed_data = data_primary.set_index('ssn').to_dict(orient='index')
+    db_primary_member_records.update(indexed_data)
 
 
 def get_all_members_records(client_id, ssn_list=[], is_claims_import=False):
-    global db_dependents_member_records, dependent_member_ssns, enrollment_type_change
+    global db_dependents_member_records, db_primary_member_records, dependent_member_ssns
+
 
     if not isinstance(ssn_list, list):
         ssn_list = [ssn_list]
@@ -139,31 +139,22 @@ def get_all_members_records(client_id, ssn_list=[], is_claims_import=False):
     db_primary_member_records = {}
     dependent_member_ssns = []
 
-    # Get dependent member details
-    dependents_records, dependent_ssns = get_dependents_member_details(client_id, ssn_list, 'unique_dependent_id', enrollment_type_change)
-    db_dependents_member_records.update(dependents_records)
+    get_dependents_member_details(client_id, ssn_list, 'unique_dependent_id', enrollment_type_change)
 
-    # Update ssn list
     employee_list = [record['employee_id'] for record in db_dependents_member_records.values()]
     ssn_list = list(set(ssn_list) - set(dependent_member_ssns))
 
     if ssn_list:
         ssn_list += employee_list
-        primary_records, primary_ssns = get_primary_member_details(client_id, ssn_list, 'unique_member_id', enrollment_type_change)
-        db_primary_member_records.update(primary_records)
+        get_primary_member_details(client_id, ssn_list, 'unique_member_id', enrollment_type_change)
 
     if is_claims_import:
-        dependents_records, dependent_ssns = get_dependents_member_details(client_id, ssn_list, 'dependent_id', enrollment_type_change)
-        db_dependents_member_records.update(dependents_records)
+        get_dependents_member_details(client_id, ssn_list, 'dependent_id', enrollment_type_change)
         employee_list = [record['employee_id'] for record in db_dependents_member_records.values()]
         ssn_list = list(set(ssn_list) - set(dependent_member_ssns))
 
         if ssn_list:
             ssn_list += employee_list
-            primary_records, primary_ssns = get_primary_member_details(client_id, ssn_list, 'member_id', enrollment_type_change)
-            db_primary_member_records.update(primary_records)
-
-    return [db_dependents_member_records, db_primary_member_records]
-
-
+            get_primary_member_details(client_id, ssn_list, 'member_id', enrollment_type_change)
+    return {'db_dependents_member_records': db_dependents_member_records, 'db_primary_member_records': db_primary_member_records}
 
