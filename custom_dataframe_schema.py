@@ -35,9 +35,13 @@ def check_date_format(date_series):
 
 
 def create_schema(user_id, client_id):
+    def employer_id_row_check(row):
+        employer_id = row['EMPLOYER_ID']
+        return employer_id_check(user_id, client_id)(employer_id, row)
+
     schema = DataFrameSchema(
         {
-            "EMPLOYER_ID": Column(pa.String, checks=[pa.Check(employer_id_check(user_id, client_id), element_wise=False)], nullable=False),
+            "EMPLOYER_ID": Column(pa.String, checks=[pa.Check.str_matches(r'^[a-zA-Z0-9_]+$')], nullable=False),
             "EMPLOYER_NAME": Column(pa.String, checks=[pa.Check.str_matches(r'^[a-zA-Z0-9_]+$')], nullable=False),
             "CLAIM_STATUS": Column(pa.String, checks=[pa.Check.isin([claim_status for claim_status, _ in CLAIM_STATUS])], nullable=True),
             "CLAIM_TYPE": Column(pa.String, checks=[pa.Check.isin(list(CLAIM_TYPE.keys()))], nullable=False),

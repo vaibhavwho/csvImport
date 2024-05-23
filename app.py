@@ -18,24 +18,37 @@ from get_all_member_records import get_all_members_records
 from get_info import get_employer_dataframe, get_provider_dataframe
 from get_options import get_lookup_option, get_diagnostic_code_list, get_provider_code_list_upload, \
     get_procedure_code_list, get_benefit_code_list_array
+from validate_employer_id import validate_employer_id
 
 
 def validate_chunk(schema, chunk, start_index):
     print(f"Process {os.getpid()} started for chunk.")
     errors = []
+    validated_records_df = pd.DataFrame()
+    error_records_df = pd.DataFrame()
+    # error_row_number = {}
     try:
-        schema.validate(chunk, lazy=True)
-    except (pa.errors.SchemaErrors, ValueError) as e:
+        validated_chunk = schema.validate(chunk, lazy=True)
+        validated_records_df = pd.concat([validated_records_df, validated_chunk], ignore_index=True)
+    except pa.errors.SchemaErrors as e:
         for error in e.failure_cases.to_dict(orient='records'):
             error_index = error['index']
-            if error_index is not None:
-                row_number = start_index + error_index
-            else:
-                row_number = None
-            errors.append({"index": error_index, "column": error['column'], "error": error['failure_case'], "row_number": row_number})
-            # break
+            row_number = start_index + error_index if error_index is not None else None
+            errors.append({
+                "index": error_index,
+                "column": error['column'],
+                "error": error['failure_case'],
+                "row_number": row_number
+            })
+            # error_row_number.update(row_number)
+        # error_records_df = pd.concat([error_records_df, chunk.loc[error_row_number]], ignore_index=True)
+        erroneous_indices = e.failure_cases['index'].tolist()
+        error_records_df = pd.concat([error_records_df, chunk.loc[erroneous_indices]], ignore_index=True)
+        valid_chunk = chunk.drop(index=erroneous_indices)
+        validated_records_df = pd.concat([validated_records_df, valid_chunk], ignore_index=True)
+
     print(f"Process {os.getpid()} finished for chunk.")
-    return errors
+    return validated_records_df, errors, error_records_df
 
 
 def create_app():
@@ -139,9 +152,9 @@ def create_app():
             # Getting employer and provider list
             employer_df = get_employer_dataframe(client_id)
             provider_df = get_provider_dataframe()
-            employer_id_list = employer_df['employer_id'].tolist()
-            provider_number_list = provider_df['provider_number'].astype(int).tolist()
-            records = get_all_members_records(client_id, members_ids, True)
+            # employer_id_list = employer_df['employer_id'].tolist()
+            # provider_number_list = provider_df['provider_number'].astype(int).tolist()
+            # records = get_all_members_records(client_id, members_ids, True)
 
 
             # lookup_options = get_lookup_option([SERVICE_TYPE, 12, 13, 14, 16, 20], True)
@@ -157,28 +170,47 @@ def create_app():
             start_indices = [sum(partition_lengths[:i]) for i in range(len(partition_lengths))]
             print(start_indices)
             all_errors = []
-
+            generated_records = []
             def process_partition(partition, start_idx):
-                df_errors = validate_chunk(schema, partition, start_idx)
-                return df_errors
+                validated_records_df, df_errors, error_records_df = validate_chunk(schema, partition, start_idx)
+                return {'validated_records_df': validated_records_df, 'df_errors': df_errors, 'error_records_df': error_records_df}
+
             partitions = ddf.to_delayed()
             futures = [dask.delayed(process_partition)(partition, start_indices[i]) for i, partition in enumerate(partitions)]
             results = dask.compute(*futures)
+            all_errors = []
+            all_valid_records_df = pd.DataFrame()
+            all_error_records_df = pd.DataFrame()
 
             for result in results:
-                all_errors.extend(result)
+                all_errors.extend(result['df_errors'])
+                all_valid_records_df = pd.concat([all_valid_records_df, result['validated_records_df']], ignore_index=True)
+                all_error_records_df = pd.concat([all_error_records_df, result['error_records_df']], ignore_index=True)
 
+            def generate_employer_info():
+                all_valid_records_df_unique = all_valid_records_df.drop_duplicates(subset=['EMPLOYER_ID'])
+                for _, row in all_valid_records_df_unique.iterrows():
+
+                    res = validate_employer_id(row['EMPLOYER_ID'], user_id, client_id, row)
+                    if res['status']:
+                        generated_records.append(res['newRecord'])
+                #
+                # return generated_records
+            generate_employer_info()
             print("Processing finished.")
 
             if all_errors:
                 response = {
                     "message": "Validation errors",
                     "errors": all_errors,
+                    'error_records': all_error_records_df.to_dict(orient='records'),
+                    'generated_records': generated_records,
                     "time_taken": time.time() - start_time
                 }
             else:
                 response = {
                     "message": "Validation successful",
+                    'generated_records': generated_records,
                     "time_taken": time.time() - start_time
                 }
 
