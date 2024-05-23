@@ -17,7 +17,7 @@ from custom_dataframe_schema import create_schema
 from get_all_member_records import get_all_members_records
 from get_info import get_employer_dataframe, get_provider_dataframe
 from get_options import get_lookup_option, get_diagnostic_code_list, get_provider_code_list_upload, \
-    get_procedure_code_list, get_benefit_code_list_array
+    get_procedure_code_list, get_benefit_code_list_array, get_place_of_service
 from validate_employer_id import validate_employer_id
 
 
@@ -62,7 +62,6 @@ def create_app():
         client_id = request_data.get('client_id')
         user_id = request_data.get('user_id')
         type = request_data.get('type')
-        schema = create_schema(user_id, client_id)
 
         if not file_path:
             return jsonify({"error": "File path not provided"}), 400
@@ -161,6 +160,10 @@ def create_app():
             provider_code_list = get_provider_code_list_upload(provider_ids)
             procedure_code_list = get_procedure_code_list()
             benefit_code_list = get_benefit_code_list_array()
+            place_of_service = get_place_of_service()
+
+            schema = create_schema(user_id, client_id, records, lookup_options, diagnostic_code_list, provider_code_list, procedure_code_list, benefit_code_list, place_of_service)
+
             print("Converting Dask DataFrame to Pandas DataFrames for validation...")
             # ddf = ddf.map_partitions(preprocess_date_columns, meta=meta)
             partition_lengths = ddf.map_partitions(len).compute()

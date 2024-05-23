@@ -21,10 +21,8 @@ def get_lookup_option(lookup_ids, to_lower=False):
                 WHERE ln.type_id IN %(lookup_ids)s AND lo.option_status = 1
             """
 
-            # Execute the query
             options = pd.read_sql_query(query, con=engine, params={'lookup_ids': tuple(lookup_ids)})
 
-            # Group by type_id and map option_id to option_value
             final_options = {}
             for type_id, group in options.groupby('type_id'):
                 data = group.set_index('option_id')['option_value'].to_dict()
@@ -148,3 +146,25 @@ def get_benefit_code_list_array():
         benefit_codes = dict(zip(data['benefit_code'], data['benefit_id']))
         get_benefit_code_list_array.benefit_codes = benefit_codes
     return get_benefit_code_list_array.benefit_codes
+
+def get_place_of_service(is_reverse=False):
+    if not hasattr(get_place_of_service, 'place_of_service'):
+        condition = ""
+        if getattr(get_place_of_service, 'get_default', False):
+            condition = f"WHERE place_of_service_code = {get_place_of_service.default_pos_code}"
+
+        sql = f"SELECT place_of_service_id, place_of_service_code, place_of_service_name FROM tbl_ph_place_of_services {condition}"
+        data = pd.read_sql_query(sql, con=engine)
+
+        if not data.empty:
+            if is_reverse:
+                place_of_service = dict(zip(data['place_of_service_id'], data['place_of_service_code']))
+            else:
+                place_of_service = dict(zip(data['place_of_service_code'], data['place_of_service_id']))
+                place_of_service_name = dict(zip(data['place_of_service_id'], data['place_of_service_name']))
+
+                get_place_of_service.place_of_service_name = place_of_service_name
+
+            get_place_of_service.place_of_service = place_of_service
+
+    return get_place_of_service.place_of_service

@@ -13,6 +13,16 @@ CLAIM_STATUS = [
     ('P', 'Closed'),
 ]
 
+CLAIM_CAUSE = {
+    'A': 'Accident',
+    'C': 'Chemical',
+    'D': 'Dental',
+    'I': 'Illness',
+    'M': 'Maternity',
+    'P': 'Psychiatric',
+    'W': 'Wellness'
+}
+
 CLAIM_TYPE = {
     'M': 'Medical',
     'D': 'Dental',
@@ -21,11 +31,15 @@ CLAIM_TYPE = {
     'O': 'Other'
 }
 
+BENEFIT_ASSIGNED = {'Y': 'Yes', 'N': 'No'}
+
 INPATIENT_OR_OUTPATIENT = {
     'I': 'Inpatient',
     'O': 'Outpatient',
     'E': 'Emergency'
 }
+
+CLAIM_FORM_TYPE = {'P': 'Professional', 'F': 'Institutional Facility'}
 
 SERVICE_TYPE = 15
 
