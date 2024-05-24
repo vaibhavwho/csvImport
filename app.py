@@ -19,6 +19,7 @@ from get_info import get_employer_dataframe, get_provider_dataframe
 from get_options import get_lookup_option, get_diagnostic_code_list, get_provider_code_list_upload, \
     get_procedure_code_list, get_benefit_code_list_array, get_place_of_service
 from validate_employer_id import validate_employer_id
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
 def validate_chunk(schema, chunk, start_index):
@@ -26,7 +27,8 @@ def validate_chunk(schema, chunk, start_index):
     errors = []
     validated_records_df = pd.DataFrame()
     error_records_df = pd.DataFrame()
-    # error_row_number = {}
+    unique_error_rows = set()
+
     try:
         validated_chunk = schema.validate(chunk, lazy=True)
         validated_records_df = pd.concat([validated_records_df, validated_chunk], ignore_index=True)
@@ -34,21 +36,24 @@ def validate_chunk(schema, chunk, start_index):
         for error in e.failure_cases.to_dict(orient='records'):
             error_index = error['index']
             row_number = start_index + error_index if error_index is not None else None
+            unique_error_rows.add(row_number)
             errors.append({
                 "index": error_index,
                 "column": error['column'],
                 "error": error['failure_case'],
                 "row_number": row_number
             })
-            # error_row_number.update(row_number)
-        # error_records_df = pd.concat([error_records_df, chunk.loc[error_row_number]], ignore_index=True)
+            if len(unique_error_rows) >= 1000:
+                print("Error row limit reached, breaking validation process.")
+                break
+
         erroneous_indices = e.failure_cases['index'].tolist()
         error_records_df = pd.concat([error_records_df, chunk.loc[erroneous_indices]], ignore_index=True)
         valid_chunk = chunk.drop(index=erroneous_indices)
         validated_records_df = pd.concat([validated_records_df, valid_chunk], ignore_index=True)
 
     print(f"Process {os.getpid()} finished for chunk.")
-    return validated_records_df, errors, error_records_df
+    return validated_records_df, errors, error_records_df, len(unique_error_rows)
 
 
 def create_app():
@@ -89,7 +94,7 @@ def create_app():
                     'CPT_PROCEDURE': 'category',
                     'DIAGNOSIS_1': 'category',
                     'CLAIM_PAID_DATE': 'object',
-                    'COVERED_AMOUNT': 'float64',
+                    'COVERED_AMOUNT': 'category',
                     'PLAN_PAID_AMOUNT': 'category',
                     'PATIENT_SSN': 'category',
                     'INPATIENT_OR_OUTPATIENT': 'category',
@@ -98,19 +103,19 @@ def create_app():
                     'NETWORK': 'category',
                     'PROVIDER_NAME': 'category',
                     'PROVIDER_PAID_NAME': 'category',
-                    'CHARGED_AMOUNT': 'float64',
+                    'CHARGED_AMOUNT': 'category',
                     'UCR': 'category',
                     'CPT_MODIFIER': 'category',
                     'DIAGNOSIS_2': 'category',
                     'DIAGNOSIS_3': 'category',
                     'DIAGNOSIS_4': 'category',
                     'DIAGNOSIS_5': 'category',
-                    'MEMBER_DEDUCTIBLE_AMOUNT': 'float64',
-                    'MEMBER_OOP_AMOUNT': 'float64',
-                    'MEMBER_COPAY_AMOUNT': 'float64',
+                    'MEMBER_DEDUCTIBLE_AMOUNT': 'category',
+                    'MEMBER_OOP_AMOUNT': 'category',
+                    'MEMBER_COPAY_AMOUNT': 'category',
                     'CLAIM_NUMBER': 'category',
-                    'CLAIM_RECEIVED_DATE': 'category',
-                    'CLAIM_ENTRY_DATE': 'category',
+                    'CLAIM_RECEIVED_DATE': 'object',
+                    'CLAIM_ENTRY_DATE': 'object',
                     'REMARKS_CODE_1': 'category',
                     'REMARKS_CODE_2': 'category',
                     'REMARKS_CODE_3': 'category',
@@ -124,8 +129,8 @@ def create_app():
                     'LOCATION_CODE': 'category',
                     'SUB_GROUP_CODE': 'category',
                     'PLAN_CODE': 'category',
-                    'ADMIT_DATE': 'category',
-                    'DISCHARGE_DATE': 'category',
+                    'ADMIT_DATE': 'object',
+                    'DISCHARGE_DATE': 'object',
                     'ADMISSION_DAYS': 'category',
                     'DISCHARGE_STATUS_CODE': 'category',
                     'POINT_OF_ORIGIN_CODE': 'category',
@@ -144,67 +149,122 @@ def create_app():
                 blocksize=20e6
             )
 
-            # Getting unique patient ids and provider npi\'s from csv
             members_ids = ddf['UNIQUE_PATIENT_ID'].astype(str).unique().compute().tolist()
             provider_ids = ddf['PROVIDER_NPI'].astype(str).unique().compute().tolist()
 
-            # Getting employer and provider list
             employer_df = get_employer_dataframe(client_id)
             provider_df = get_provider_dataframe()
             employer_id_list = employer_df['employer_id'].tolist()
             provider_number_list = provider_df['provider_number'].astype(int).tolist()
-            records = get_all_members_records(client_id, members_ids, True)
 
-            lookup_options = get_lookup_option([SERVICE_TYPE, 12, 13, 14, 16, 20], True)
-            diagnostic_code_list = get_diagnostic_code_list()
-            provider_code_list = get_provider_code_list_upload(provider_ids)
-            procedure_code_list = get_procedure_code_list()
-            benefit_code_list = get_benefit_code_list_array()
-            place_of_service = get_place_of_service()
+            # start_seq_time = time.time()
+            # records = get_all_members_records(client_id, members_ids, True)
+            # lookup_options = get_lookup_option([SERVICE_TYPE, 12, 13, 14, 16, 20], True)
+            # diagnostic_code_list = get_diagnostic_code_list()
+            # provider_code_list = get_provider_code_list_upload(provider_ids, False)
+            # procedure_code_list = get_procedure_code_list()
+            # benefit_code_list = get_benefit_code_list_array()
+            # place_of_service = get_place_of_service()
+            # end_seq_time = time.time()
+            # print(f"Sequential fetching took {end_seq_time - start_seq_time} seconds")
+            # schema = create_schema(
+            #     user_id,
+            #     client_id,
+            #     records,
+            #     lookup_options,
+            #     diagnostic_code_list,
+            #     provider_code_list,
+            #     procedure_code_list,
+            #     benefit_code_list,
+            #     place_of_service
+            # )
+            with ThreadPoolExecutor() as executor:
+                start_parallel_time = time.time()
+                futures = {
+                    executor.submit(get_all_members_records, client_id, members_ids, True): "records",
+                    executor.submit(get_lookup_option, [SERVICE_TYPE, 12, 13, 14, 16, 20], True): "lookup_options",
+                    executor.submit(get_diagnostic_code_list): "diagnostic_code_list",
+                    executor.submit(get_provider_code_list_upload, provider_ids, False): "provider_code_list",
+                    executor.submit(get_procedure_code_list): "procedure_code_list",
+                    executor.submit(get_benefit_code_list_array): "benefit_code_list",
+                    executor.submit(get_place_of_service): "place_of_service"
+                }
 
-            schema = create_schema(user_id, client_id, records, lookup_options, diagnostic_code_list, provider_code_list, procedure_code_list, benefit_code_list, place_of_service)
+                results = {}
+                for future in as_completed(futures):
+                    results[futures[future]] = future.result()
+                end_parallel_time = time.time()
+                print(f"Parallel fetching took {end_parallel_time - start_parallel_time} seconds")
 
-            print("Converting Dask DataFrame to Pandas DataFrames for validation...")
-            # ddf = ddf.map_partitions(preprocess_date_columns, meta=meta)
+            schema = create_schema(
+                user_id,
+                client_id,
+                results["records"],
+                results["lookup_options"],
+                results["diagnostic_code_list"],
+                results["provider_code_list"],
+                results["procedure_code_list"],
+                results["benefit_code_list"],
+                results["place_of_service"]
+            )
+
             partition_lengths = ddf.map_partitions(len).compute()
             start_indices = [sum(partition_lengths[:i]) for i in range(len(partition_lengths))]
             print(start_indices)
+
             all_errors = []
             generated_records = []
+            error_file_path = f"validation_errors_{time.strftime('%d-%b-%Y_%a-%H:%M:%S')}.csv"
 
             def process_partition(partition, start_idx):
-                validated_records_df, df_errors, error_records_df = validate_chunk(schema, partition, start_idx)
-                return {'validated_records_df': validated_records_df, 'df_errors': df_errors, 'error_records_df': error_records_df}
+                validated_records_df, df_errors, error_records_df, unique_error_row_count = validate_chunk(schema,
+                                                                                                           partition,
+                                                                                                           start_idx)
+                return {'validated_records_df': validated_records_df, 'df_errors': df_errors,
+                        'error_records_df': error_records_df, 'unique_error_row_count': unique_error_row_count}
 
             partitions = ddf.to_delayed()
-            futures = [dask.delayed(process_partition)(partition, start_indices[i]) for i, partition in enumerate(partitions)]
+            futures = [dask.delayed(process_partition)(partition, start_indices[i]) for i, partition in
+                       enumerate(partitions)]
             results = dask.compute(*futures)
-            all_errors = []
+
+            unique_error_row_count = 0
             all_valid_records_df = pd.DataFrame()
             all_error_records_df = pd.DataFrame()
 
             for result in results:
                 all_errors.extend(result['df_errors'])
-                all_valid_records_df = pd.concat([all_valid_records_df, result['validated_records_df']], ignore_index=True)
+                all_valid_records_df = pd.concat([all_valid_records_df, result['validated_records_df']],
+                                                 ignore_index=True)
                 all_error_records_df = pd.concat([all_error_records_df, result['error_records_df']], ignore_index=True)
+                unique_error_row_count += result['unique_error_row_count']
+                if unique_error_row_count >= 1000:
+                    print("Total error row limit reached, saving errors to CSV.")
+                    all_error_records_df.head(1000).to_csv(error_file_path, index=False)
+                    response = {
+                        "message": "Validation errors exceeded the limit",
+                        "errors": all_errors[:1000],
+                        "error_file_path": error_file_path,
+                        "time_taken": time.time() - start_time
+                    }
+                    return jsonify(response), 200
 
             def generate_employer_info():
                 all_valid_records_df_unique = all_valid_records_df.drop_duplicates(subset=['EMPLOYER_ID'])
                 for _, row in all_valid_records_df_unique.iterrows():
-
                     res = validate_employer_id(row['EMPLOYER_ID'], user_id, client_id, row)
                     if res['status']:
                         generated_records.append(res['newRecord'])
-                #
-                # return generated_records
+
             generate_employer_info()
+
             print("Processing finished.")
 
             if all_errors:
                 response = {
                     "message": "Validation errors",
                     "errors": all_errors,
-                    'error_records': all_error_records_df.to_dict(orient='records'),
+                    # 'error_records': all_error_records_df.to_dict(orient='records'),
                     'generated_records': generated_records,
                     "time_taken": time.time() - start_time
                 }

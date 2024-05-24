@@ -74,24 +74,27 @@ def get_diagnostic_code_list(is_reverse=False):
 # get_diagnostic_code_list.default_diagnostic_code = '00000000'
 
 def get_provider_code_list_upload(provider_ids, is_reverse=False):
-
     if not hasattr(get_provider_code_list_upload, 'provider_codes'):
         get_provider_code_list_upload.provider_codes = None
 
     if get_provider_code_list_upload.provider_codes is not None:
+        print("Returning cached provider codes")
         return get_provider_code_list_upload.provider_codes
 
     condition = ""
     if provider_ids:
-
         providers = '", "'.join(provider_ids)
         if is_reverse:
             condition = f'WHERE provider_id IN ("{providers}")'
         else:
             condition = f'WHERE provider_number IN ("{providers}")'
 
+    # print(f"SQL Query Condition: {condition}")
     query = f"SELECT provider_id, provider_number FROM tbl_ph_providers {condition}"
+    # print(f"SQL Query: {query}")
+
     data = pd.read_sql_query(query, con=engine)
+    # print(f"Query Result: {data}")
 
     if not data.empty:
         if is_reverse:
@@ -103,7 +106,9 @@ def get_provider_code_list_upload(provider_ids, is_reverse=False):
     else:
         get_provider_code_list_upload.provider_codes = {}
 
+    # print(f"Provider Codes: {get_provider_code_list_upload.provider_codes}")
     return get_provider_code_list_upload.provider_codes
+
 
 
 def get_procedure_code_list(is_reverse=False):
@@ -148,6 +153,7 @@ def get_benefit_code_list_array():
     return get_benefit_code_list_array.benefit_codes
 
 def get_place_of_service(is_reverse=False):
+    get_place_of_service.default_pos_code = '0000'
     if not hasattr(get_place_of_service, 'place_of_service'):
         condition = ""
         if getattr(get_place_of_service, 'get_default', False):

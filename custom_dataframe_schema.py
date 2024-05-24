@@ -35,10 +35,9 @@ def check_date_format(date_series):
 
 
 def create_schema(user_id, client_id, records, lookup_options, diagnostic_code_list, provider_code_list, procedure_code_list, benefit_code_list, place_of_service):
-
-    def employer_id_row_check(row):
-        employer_id = row['EMPLOYER_ID']
-        return employer_id_check(user_id, client_id)(employer_id, row)
+    # def employer_id_row_check(row):
+    #     employer_id = row['EMPLOYER_ID']
+    #     return employer_id_check(user_id, client_id)(employer_id, row)
 
     schema = DataFrameSchema(
         {
@@ -48,9 +47,9 @@ def create_schema(user_id, client_id, records, lookup_options, diagnostic_code_l
             "CLAIM_TYPE": Column(pa.String, checks=[pa.Check.isin(list(CLAIM_TYPE.keys()))], nullable=False),
             "SERVICE_START_DATE": Column(pa.String, checks=[pa.Check(check_date_format, element_wise=False)], nullable=True),
             "SERVICE_END_DATE": Column(pa.String, checks=[pa.Check(check_date_format, element_wise=False)], nullable=True),
-            "PROVIDER_NPI": Column(pa.String, checks=[pa.Check.str_matches(r'^[a-zA-Z0-9_]+$'), pa.Check.isin(list(provider_code_list.values()))], nullable=True),
-            "PLACE_OF_SERVICE": Column(pa.String, checks=[pa.Check.str_matches(r'^[a-zA-Z0-9_]+$'), pa.Check.isin(list(place_of_service.values()))], nullable=True),
-            "CPT_PROCEDURE": Column(pa.String, checks=[pa.Check.str_matches(r'^[a-zA-Z0-9_]+$'), pa.check(list(procedure_code_list.values()))], nullable=True),
+            "PROVIDER_NPI": Column(pa.String, checks=[pa.Check.str_matches(r'^[a-zA-Z0-9_]+$'), pa.Check.isin(list(provider_code_list.keys()))], nullable=True),
+            "PLACE_OF_SERVICE": Column(pa.String, checks=[pa.Check.str_matches(r'^[a-zA-Z0-9_]+$'), pa.Check.isin(list(place_of_service.keys()))], nullable=True),
+            "CPT_PROCEDURE": Column(pa.String, checks=[pa.Check.str_matches(r'^[a-zA-Z0-9_]+$'), pa.Check.isin(list(procedure_code_list.values()))], nullable=True),
             "DIAGNOSIS_1": Column(pa.String, checks=[pa.Check.str_matches(r'^[a-zA-Z0-9_]+$')], nullable=True),
             "CLAIM_PAID_DATE": Column(pa.String, checks=[pa.Check(check_date_format, element_wise=False)], nullable=False),
             "COVERED_AMOUNT": Column(pa.String, checks=[pa.Check.str_matches(r'^(\d+(\.\d*)?|\.\d+)$')], nullable=True),
@@ -79,7 +78,7 @@ def create_schema(user_id, client_id, records, lookup_options, diagnostic_code_l
             "REMARKS_CODE_2": Column(pa.String, checks=[pa.Check.str_matches(r'^[a-zA-Z0-9_]+$')], nullable=True),
             "REMARKS_CODE_3": Column(pa.String, checks=[pa.Check.str_matches(r'^[a-zA-Z0-9_]+$')], nullable=True),
             "CHECK_NUMBER": Column(pa.String, checks=[pa.Check.str_matches(r'^[a-zA-Z0-9_]+$')], nullable=True),
-            "BENEFITS_ASSIGNED": Column(pa.String, checks=[pa.Check.isin(list(BENEFIT_ASSIGNED.values()))], nullable=True),
+            "BENEFITS_ASSIGNED": Column(pa.String, checks=[pa.Check.isin(list(BENEFIT_ASSIGNED.keys()))], nullable=True),
             "REVENUE_CODE": Column(pa.String, checks=[pa.Check.str_matches(r'^[a-zA-Z0-9_]+$')], nullable=True),
             "PROVIDER_EIN": Column(pa.String, checks=[pa.Check.str_matches(r'^[a-zA-Z0-9_]+$')], nullable=True),
             "PROVIDER_PAID_NPI": Column(pa.String, checks=[pa.Check.str_matches(r'^[a-zA-Z0-9_]+$'), pa.Check.isin(list(provider_code_list.values()))], nullable=True),
@@ -95,7 +94,7 @@ def create_schema(user_id, client_id, records, lookup_options, diagnostic_code_l
             "POINT_OF_ORIGIN_CODE": Column(pa.String, checks=[pa.Check.str_matches(r'^[a-zA-Z0-9_]+$')], nullable=True),
             "ADMISSION_DIAGNOSIS_CODE": Column(pa.String, checks=[pa.Check.str_matches(r'^[a-zA-Z0-9_]+$')], nullable=True),
             "PATIENT_REASON_DIAGNOSIS_CODE": Column(pa.String, checks=[pa.Check.str_matches(r'^[a-zA-Z0-9_]+$')], nullable=True),
-            "CLAIM_FORM_TYPE": Column(pa.String, checks=[pa.Check.str_matches(r'^[a-zA-Z0-9_]+$'), pa.Check.isin(list(CLAIM_FORM_TYPE.values()))], required=False, nullable=True),
+            "CLAIM_FORM_TYPE": Column(pa.String, checks=[pa.Check.isin(list(CLAIM_FORM_TYPE.keys()))], required=False, nullable=True),
             "TYPE_OF_BILL_CODE": Column(pa.String, checks=[pa.Check.str_matches(r'^[a-zA-Z0-9_]+$')], required=False,  nullable=True),
             "ORIGINAL_PROCEDURE_CODE": Column(pa.String, checks=[pa.Check.str_matches(r'^[a-zA-Z0-9_]+$')], required=False, nullable=True),
             "ORIGINAL_POS_CODE": Column(pa.String, checks=[pa.Check.str_matches(r'^[a-zA-Z0-9_]+$')], required=False, nullable=True),
