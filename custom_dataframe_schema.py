@@ -35,7 +35,7 @@ def check_date_format(date_series):
 
 
 def create_schema(user_id, client_id, records, lookup_options, diagnostic_code_list, provider_code_list, procedure_code_list, benefit_code_list, place_of_service):
-    # print(provider_code_list)
+    # print(procedure_code_list)
     # pdb.set_trace()
     # def employer_id_row_check(row):
     #     employer_id = row['EMPLOYER_ID']
@@ -52,7 +52,7 @@ def create_schema(user_id, client_id, records, lookup_options, diagnostic_code_l
             "SERVICE_END_DATE": Column(pa.String, checks=[pa.Check(check_date_format, element_wise=False)], nullable=True),
             "PROVIDER_NPI": Column(pa.String, checks=[pa.Check.str_matches(r'^[a-zA-Z0-9_]+$'), pa.Check.isin(list(provider_code_list.values()))], nullable=True),
             "PLACE_OF_SERVICE": Column(pa.String, checks=[pa.Check.str_matches(r'^[a-zA-Z0-9_]+$'), pa.Check.isin(list(place_of_service.keys()))], nullable=True),
-            "CPT_PROCEDURE": Column(pa.String, checks=[pa.Check.str_matches(r'^[a-zA-Z0-9_]+$'), pa.Check.isin(list(procedure_code_list.keys()))], nullable=True),
+            "CPT_PROCEDURE": Column(pa.String, checks=[pa.Check.isin(list(procedure_code_list.values()))], nullable=True),
             "DIAGNOSIS_1": Column(pa.String, checks=[pa.Check.str_matches(r'^[a-zA-Z0-9_]+$')], nullable=True),
             "CLAIM_PAID_DATE": Column(pa.String, checks=[pa.Check(check_date_format, element_wise=False)], nullable=False),
             "COVERED_AMOUNT": Column(pa.String, checks=[pa.Check.str_matches(r'^(\d+(\.\d*)?|\.\d+)$')], nullable=True),

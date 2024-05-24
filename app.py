@@ -152,12 +152,12 @@ def create_app():
 
             members_ids = ddf['UNIQUE_PATIENT_ID'].astype(str).unique().compute().tolist()
             provider_ids = ddf['PROVIDER_NPI'].astype(str).unique().compute().tolist()
-
+            cpt_procedures = ddf['CPT_PROCEDURE'].astype(str).unique().compute().tolist()
             employer_df = get_employer_dataframe(client_id)
             provider_df = get_provider_dataframe()
             employer_id_list = employer_df['employer_id'].tolist()
             provider_number_list = provider_df['provider_number'].astype(int).tolist()
-
+            member_records = []
             # start_seq_time = time.time()
             # records = get_all_members_records(client_id, members_ids, True)
             # lookup_options = get_lookup_option([SERVICE_TYPE, 12, 13, 14, 16, 20], True)
@@ -186,7 +186,7 @@ def create_app():
                     executor.submit(get_lookup_option, [SERVICE_TYPE, 12, 13, 14, 16, 20], True): "lookup_options",
                     executor.submit(get_diagnostic_code_list): "diagnostic_code_list",
                     executor.submit(get_provider_code_list_upload, provider_ids, False): "provider_code_list",
-                    executor.submit(get_procedure_code_list): "procedure_code_list",
+                    executor.submit(get_procedure_code_list, cpt_procedures, False): "procedure_code_list",
                     executor.submit(get_benefit_code_list_array): "benefit_code_list",
                     executor.submit(get_place_of_service): "place_of_service"
                 }
@@ -196,7 +196,7 @@ def create_app():
                     results[futures[future]] = future.result()
                 end_parallel_time = time.time()
                 print(f"Parallel fetching took {end_parallel_time - start_parallel_time} seconds")
-
+            member_records = results["records"]
             schema = create_schema(
                 user_id,
                 client_id,
@@ -258,10 +258,9 @@ def create_app():
                         generated_records.append(res['newRecord'])
 
             generate_employer_info()
-
             print("Processing finished.")
             print("Inserting Data in Database")
-            insert_data(all_valid_records_df, generated_records, engine, metadata, client_id, user_id)
+            insert_data(all_valid_records_df, generated_records, engine, metadata, client_id, user_id, member_records)
             print("Insertion Finished")
             if all_errors:
                 response = {
