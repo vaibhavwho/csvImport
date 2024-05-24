@@ -89,12 +89,12 @@ def get_provider_code_list_upload(provider_ids, is_reverse=False):
         else:
             condition = f'WHERE provider_number IN ("{providers}")'
 
-    # print(f"SQL Query Condition: {condition}")
+    print(f"SQL Query Condition: {condition}")
     query = f"SELECT provider_id, provider_number FROM tbl_ph_providers {condition}"
-    # print(f"SQL Query: {query}")
+    print(f"SQL Query: {query}")
 
     data = pd.read_sql_query(query, con=engine)
-    # print(f"Query Result: {data}")
+    print(f"Query Result: {data}")
 
     if not data.empty:
         if is_reverse:
@@ -106,7 +106,7 @@ def get_provider_code_list_upload(provider_ids, is_reverse=False):
     else:
         get_provider_code_list_upload.provider_codes = {}
 
-    # print(f"Provider Codes: {get_provider_code_list_upload.provider_codes}")
+    print(f"Provider Codes: {get_provider_code_list_upload.provider_codes}")
     return get_provider_code_list_upload.provider_codes
 
 

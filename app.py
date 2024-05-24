@@ -18,6 +18,7 @@ from get_all_member_records import get_all_members_records
 from get_info import get_employer_dataframe, get_provider_dataframe
 from get_options import get_lookup_option, get_diagnostic_code_list, get_provider_code_list_upload, \
     get_procedure_code_list, get_benefit_code_list_array, get_place_of_service
+from insert_data_into_db import insert_data, engine, metadata
 from validate_employer_id import validate_employer_id
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -259,7 +260,9 @@ def create_app():
             generate_employer_info()
 
             print("Processing finished.")
-
+            print("Inserting Data in Database")
+            insert_data(all_valid_records_df, generated_records, engine, metadata, client_id, user_id)
+            print("Insertion Finished")
             if all_errors:
                 response = {
                     "message": "Validation errors",

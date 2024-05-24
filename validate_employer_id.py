@@ -17,7 +17,6 @@ def set_default_attributes(user_id, record):
 
 def prepare_employer_information(employer_id, user_id, client_id, employer_name):
     record = {
-        "id": '',
         "client_id": client_id,
         "employer_id": employer_id,
         "employer_name": employer_name
