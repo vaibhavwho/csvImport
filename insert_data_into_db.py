@@ -119,7 +119,7 @@ def process_partition(employer_id_map, active_member_records, partition, client_
     partition['member_name'] = partition['UNIQUE_PATIENT_ID'].map(lambda x: active_member_records.get(str(x).lower(), {}).get('member_name'))
     partition['member_id'] = partition['UNIQUE_PATIENT_ID'].map(lambda x: active_member_records.get(str(x).lower(), {}).get('member_id'))
     partition['employer_id'] = partition['EMPLOYER_ID'].map(lambda x: employer_id_map.get(str(x)))
-    partition['place_of_service'] = partition['PLACE_OF_SERVICE'].fillna(0).astype(int)
+    partition['place_of_service'] = partition['PLACE_OF_SERVICE']
 
     if 'diagnosis_2' in partition.columns and partition['diagnosis_2'].dtype.name == 'category':
         partition['diagnosis_2'] = partition['diagnosis_2'].cat.add_categories(['00000000'])
@@ -129,7 +129,7 @@ def process_partition(employer_id_map, active_member_records, partition, client_
         partition['diagnosis_4'] = partition['diagnosis_4'].cat.add_categories(['00000000'])
     if 'diagnosis_5' in partition.columns and partition['diagnosis_5'].dtype.name == 'category':
         partition['diagnosis_5'] = partition['diagnosis_5'].cat.add_categories(['00000000'])
-    partition['claim_status'] = None if partition['CLAIM_STATUS'] else None
+    partition['claim_status'] = None
     columns_to_map = [
         'employer_id',
         'claim_status',

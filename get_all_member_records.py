@@ -104,18 +104,16 @@ def get_all_members_records(client_id, ssn_list=[], is_claims_import=False):
     db_dependents_member_records = {}
     db_primary_member_records = {}
 
-    for ssn in ssn_list:
-        # Check in dependents
-        get_dependents_member_details(client_id, [ssn], 'unique_dependent_id', 'grid')
-        # Check in primary members
-        get_primary_member_details(client_id, [ssn], 'unique_member_id', 'grid')
+    # Check in dependents
+    get_dependents_member_details(client_id, ssn_list, 'unique_dependent_id', 'grid')
+    # Check in primary members
+    get_primary_member_details(client_id, ssn_list, 'unique_member_id', 'grid')
 
     if is_claims_import:
-        for ssn in ssn_list:
-            # Check in dependents for claims import
-            get_dependents_member_details(client_id, [ssn], 'dependent_id', 'grid')
-            # Check in primary members for claims import
-            get_primary_member_details(client_id, [ssn], 'member_id', 'grid')
+        # Check in dependents for claims import
+        get_dependents_member_details(client_id, ssn_list, 'dependent_id', 'grid')
+        # Check in primary members for claims import
+        get_primary_member_details(client_id, ssn_list, 'member_id', 'grid')
 
     return {
         'db_dependents_member_records': db_dependents_member_records,
