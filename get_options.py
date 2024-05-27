@@ -74,6 +74,7 @@ def get_diagnostic_code_list(is_reverse=False):
 # get_diagnostic_code_list.default_diagnostic_code = '00000000'
 
 def get_provider_code_list_upload(provider_ids, is_reverse=False):
+    provider_ids = tuple(provider_ids)
     if not hasattr(get_provider_code_list_upload, 'provider_codes'):
         get_provider_code_list_upload.provider_codes = None
 
@@ -85,9 +86,12 @@ def get_provider_code_list_upload(provider_ids, is_reverse=False):
     if provider_ids:
         providers = '", "'.join(provider_ids)
         if is_reverse:
-            condition = f'WHERE provider_id IN ("{providers}")'
+            formatted_providers = ", ".join(f"'{prov}'" for prov in provider_ids)
+            condition = f'WHERE provider_id IN ("{formatted_providers}")'
         else:
-            condition = f'WHERE provider_number IN ("{providers}")'
+            formatted_providers = ", ".join(f"'{prov}'" for prov in provider_ids)
+            condition = f" WHERE provider_number IN ({formatted_providers})"
+
 
     # print(f"SQL Query Condition: {condition}")
     query = f"SELECT provider_id, provider_number FROM tbl_ph_providers {condition}"
@@ -127,10 +131,12 @@ def get_procedure_code_list(cpt_procedures, is_reverse=False):
         condition = f"WHERE procedure_code = '{get_procedure_code_list.default_procedure_code}'"
 
     query = f"SELECT procedure_id, procedure_code FROM tbl_ph_procedures"
+
     if condition:
         query += " {condition} AND "
-    else:
-        query += F" WHERE procedure_code IN {cpt_procedures} "
+    elif cpt_procedures:
+        formatted_procedures = ", ".join(f"'{proc}'" for proc in cpt_procedures)
+        query += f" WHERE procedure_code IN ({formatted_procedures})"
     data = pd.read_sql_query(query, con=engine)
 
     if not data.empty:

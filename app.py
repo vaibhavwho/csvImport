@@ -6,6 +6,7 @@ from flask import Flask, request, jsonify, g
 from pathlib import Path
 import pandas as pd
 import pandera as pa
+from pandas import Timestamp
 from pandera import DataFrameSchema, Column, Check
 import multiprocessing as mp
 import concurrent.futures
@@ -77,6 +78,7 @@ def create_app():
             return jsonify({"error": "File not found"}), 400
 
         try:
+            processing_start_time = time.time()
             print("Reading CSV file in parallel using Dask...")
             ddf = dd.read_csv(
                 path,
@@ -150,24 +152,26 @@ def create_app():
                 blocksize=20e6
             )
 
-            members_ids = ddf['UNIQUE_PATIENT_ID'].astype(str).unique().compute().tolist()
+            members_ids = ddf['UNIQUE_PATIENT_ID'].dropna().astype(str).unique().compute().tolist()
             provider_ids = ddf['PROVIDER_NPI'].astype(str).unique().compute().tolist()
-            cpt_procedures = ddf['CPT_PROCEDURE'].astype(str).unique().compute().tolist()
+            cpt_procedures = ddf['CPT_PROCEDURE'].dropna().astype(str).unique().compute().tolist()
             employer_df = get_employer_dataframe(client_id)
             provider_df = get_provider_dataframe()
             employer_id_list = employer_df['employer_id'].tolist()
             provider_number_list = provider_df['provider_number'].astype(int).tolist()
-            member_records = []
+
+            # print('Sequential fetching started')
             # start_seq_time = time.time()
             # records = get_all_members_records(client_id, members_ids, True)
             # lookup_options = get_lookup_option([SERVICE_TYPE, 12, 13, 14, 16, 20], True)
             # diagnostic_code_list = get_diagnostic_code_list()
             # provider_code_list = get_provider_code_list_upload(provider_ids, False)
-            # procedure_code_list = get_procedure_code_list()
+            # procedure_code_list = get_procedure_code_list(cpt_procedures)
             # benefit_code_list = get_benefit_code_list_array()
             # place_of_service = get_place_of_service()
             # end_seq_time = time.time()
             # print(f"Sequential fetching took {end_seq_time - start_seq_time} seconds")
+            #
             # schema = create_schema(
             #     user_id,
             #     client_id,
@@ -179,6 +183,8 @@ def create_app():
             #     benefit_code_list,
             #     place_of_service
             # )
+
+            print("Parallel fetch starting...")
             with ThreadPoolExecutor() as executor:
                 start_parallel_time = time.time()
                 futures = {
@@ -190,12 +196,12 @@ def create_app():
                     executor.submit(get_benefit_code_list_array): "benefit_code_list",
                     executor.submit(get_place_of_service): "place_of_service"
                 }
-
                 results = {}
                 for future in as_completed(futures):
                     results[futures[future]] = future.result()
                 end_parallel_time = time.time()
                 print(f"Parallel fetching took {end_parallel_time - start_parallel_time} seconds")
+
             member_records = results["records"]
             schema = create_schema(
                 user_id,
@@ -216,7 +222,6 @@ def create_app():
             all_errors = []
             generated_records = []
             error_file_path = f"validation_errors_{time.strftime('%d-%b-%Y_%a-%H:%M:%S')}.csv"
-
             def process_partition(partition, start_idx):
                 validated_records_df, df_errors, error_records_df, unique_error_row_count = validate_chunk(schema,
                                                                                                            partition,
@@ -258,10 +263,11 @@ def create_app():
                         generated_records.append(res['newRecord'])
 
             generate_employer_info()
-            print("Processing finished.")
+            print(f"Processing finished, time taken {time.time() - processing_start_time}")
+
             print("Inserting Data in Database")
             insert_data(all_valid_records_df, generated_records, engine, metadata, client_id, user_id, member_records)
-            print("Insertion Finished")
+            print(f"Insertion Finished, time taken {time.time() - processing_start_time}")
             if all_errors:
                 response = {
                     "message": "Validation errors",

@@ -121,15 +121,14 @@ def process_partition(employer_id_map, active_member_records, partition, client_
     partition['employer_id'] = partition['EMPLOYER_ID'].map(lambda x: employer_id_map.get(str(x)))
     partition['place_of_service'] = partition['PLACE_OF_SERVICE']
 
-    if 'diagnosis_2' in partition.columns and partition['diagnosis_2'].dtype.name == 'category':
-        partition['diagnosis_2'] = partition['diagnosis_2'].cat.add_categories(['00000000'])
-    if 'diagnosis_3' in partition.columns and partition['diagnosis_3'].dtype.name == 'category':
-        partition['diagnosis_3'] = partition['diagnosis_3'].cat.add_categories(['00000000'])
-    if 'diagnosis_4' in partition.columns and partition['diagnosis_4'].dtype.name == 'category':
-        partition['diagnosis_4'] = partition['diagnosis_4'].cat.add_categories(['00000000'])
-    if 'diagnosis_5' in partition.columns and partition['diagnosis_5'].dtype.name == 'category':
-        partition['diagnosis_5'] = partition['diagnosis_5'].cat.add_categories(['00000000'])
-    partition['claim_status'] = None
+    diagnosis_columns = ['diagnosis_2', 'diagnosis_3', 'diagnosis_4', 'diagnosis_5']
+    for col in diagnosis_columns:
+        if col in partition.columns and partition[col].dtype.name == 'category':
+            partition[col] = partition[col].cat.add_categories(['00000000'])
+
+    if 'claim_status' not in partition.columns:
+        partition['claim_status'] = None
+
     columns_to_map = [
         'employer_id',
         'claim_status',
@@ -196,7 +195,10 @@ def process_partition(employer_id_map, active_member_records, partition, client_
     ]
 
     for column in columns_to_map:
-        partition[column] = partition[column].fillna(partition[column].name)
+        if column not in partition.columns:
+            partition[column] = None
+        else:
+            partition[column] = partition[column].fillna(partition[column].name)
 
     if 'claim_form_type' not in partition.columns:
         partition['claim_form_type'] = np.nan
