@@ -16,11 +16,34 @@ tbl_ph_claims = metadata.tables['tbl_ph_claims']
 tbl_ph_employer_info = metadata.tables['tbl_ph_employer_info']
 tbl_ph_med_field = metadata.tables['tbl_ph_med_field']
 
+
 def process_chunk(chunk, employer_id_map, active_member_records, client_id, user_id):
     claims_data = []
     med_field_data_list = []
-    for row in chunk.itertuples(index=False):
-        unique_patient_id = str(row.UNIQUE_PATIENT_ID).lower()
+
+    # Retrieve necessary columns outside the loop
+    chunk_unique_patient_ids = chunk['UNIQUE_PATIENT_ID'].str.lower()
+    chunk_claim_received_dates = chunk['CLAIM_RECEIVED_DATE']
+    chunk_claim_entry_dates = chunk['CLAIM_ENTRY_DATE']
+    chunk_place_of_services = chunk['PLACE_OF_SERVICE']
+    chunk_diagnosis_2 = chunk['DIAGNOSIS_2']
+    chunk_diagnosis_3 = chunk['DIAGNOSIS_3']
+    chunk_diagnosis_4 = chunk['DIAGNOSIS_4']
+    chunk_diagnosis_5 = chunk['DIAGNOSIS_5']
+    chunk_medical_records = chunk[['CLAIM_FORM_TYPE', 'TYPE_OF_BILL_CODE']]
+
+    for unique_patient_id, row, claim_received_date, claim_entry_date, place_of_service, diagnosis_2, diagnosis_3, diagnosis_4, diagnosis_5, med_record in zip(
+        chunk_unique_patient_ids,
+        chunk.itertuples(index=False),
+        chunk_claim_received_dates,
+        chunk_claim_entry_dates,
+        chunk_place_of_services,
+        chunk_diagnosis_2,
+        chunk_diagnosis_3,
+        chunk_diagnosis_4,
+        chunk_diagnosis_5,
+        chunk_medical_records.itertuples(index=False)
+    ):
         member_record = active_member_records.get(unique_patient_id)
         claim_record = {
             'id': None,
@@ -33,20 +56,20 @@ def process_chunk(chunk, employer_id_map, active_member_records, client_id, user
             'patient_ssn': row.PATIENT_SSN,
             'unique_patient_id': row.UNIQUE_PATIENT_ID,
             'sir_id': None,
-            'original_unique_patient_id': member_record['original_id'] if member_record else None,
-            'subscriber_type': member_record['subscriber_type'] if member_record else None,
+            'original_unique_patient_id': member_record.get('original_id') if member_record else None,
+            'subscriber_type': member_record.get('subscriber_type') if member_record else None,
             'employee_status': None,
-            'gender': member_record['gender'] if member_record else None,
-            'dob': member_record['dob'] if member_record else None,
+            'gender': member_record.get('gender') if member_record else None,
+            'dob': member_record.get('dob') if member_record else None,
             'age': None,
-            'state': member_record['state'] if member_record else None,
-            'address': member_record['address'] if member_record else None,
-            'city': member_record['city'] if member_record else None,
-            'zip': member_record['zip'] if member_record else None,
-            'latitude': member_record['latitude'] if member_record else None,
-            'longitude': member_record['longitude'] if member_record else None,
-            'member_name': member_record['member_name'] if member_record else None,
-            'member_id': member_record['member_id'] if member_record else None,
+            'state': member_record.get('state') if member_record else None,
+            'address': member_record.get('address') if member_record else None,
+            'city': member_record.get('city') if member_record else None,
+            'zip': member_record.get('zip') if member_record else None,
+            'latitude': member_record.get('latitude') if member_record else None,
+            'longitude': member_record.get('longitude') if member_record else None,
+            'member_name': member_record.get('member_name') if member_record else None,
+            'member_id': member_record.get('member_id') if member_record else None,
             'inpatient_or_outpatient': getattr(row, 'INPATIENT_OR_OUTPATIENT', None),
             'claim_cause': getattr(row, 'CLAIM_CAUSE', None),
             'benefit_code': getattr(row, 'BENEFIT_CODE', None),
@@ -55,16 +78,16 @@ def process_chunk(chunk, employer_id_map, active_member_records, client_id, user
             'provider_paid_name': getattr(row, 'PROVIDER_PAID_NAME', None),
             'ucr': getattr(row, 'UCR', None),
             'cpt_modifier': getattr(row, 'CPT_MODIFIER', None),
-            'diagnosis_2': getattr(row, 'DIAGNOSIS_2', '00000000') if pd.notna(getattr(row, 'DIAGNOSIS_2', None)) else '00000000',
-            'diagnosis_3': getattr(row, 'DIAGNOSIS_3', '00000000') if pd.notna(getattr(row, 'DIAGNOSIS_3', None)) else '00000000',
-            'diagnosis_4': getattr(row, 'DIAGNOSIS_4', '00000000') if pd.notna(getattr(row, 'DIAGNOSIS_4', None)) else '00000000',
-            'diagnosis_5': getattr(row, 'DIAGNOSIS_5', '00000000') if pd.notna(getattr(row, 'DIAGNOSIS_5', None)) else '00000000',
+            'diagnosis_2': diagnosis_2 if pd.notna(diagnosis_2) else '00000000',
+            'diagnosis_3': diagnosis_3 if pd.notna(diagnosis_3) else '00000000',
+            'diagnosis_4': diagnosis_4 if pd.notna(diagnosis_4) else '00000000',
+            'diagnosis_5': diagnosis_5 if pd.notna(diagnosis_5) else '00000000',
             'member_deductible_amount': getattr(row, 'MEMBER_DEDUCTIBLE_AMOUNT', None),
             'member_oop_amount': getattr(row, 'MEMBER_OOP_AMOUNT', None),
             'member_copay_amount': getattr(row, 'MEMBER_COPAY_AMOUNT', None),
             'claim_number': getattr(row, 'CLAIM_NUMBER', None),
-            'claim_received_date': getattr(row, 'CLAIM_RECEIVED_DATE', None),
-            'claim_entry_date': getattr(row, 'CLAIM_ENTRY_DATE', None),
+            'claim_received_date': claim_received_date,
+            'claim_entry_date': claim_entry_date,
             'adjuster': None,
             'document_number': None,
             'sequence': None,
@@ -85,7 +108,7 @@ def process_chunk(chunk, employer_id_map, active_member_records, client_id, user
             'procedure_code': None,
             'ndc_code': None,
             'provider': None,
-            'place_of_service': int(getattr(row, 'PLACE_OF_SERVICE', 0)) if pd.notna(getattr(row, 'PLACE_OF_SERVICE', None)) else 0,
+            'place_of_service': int(place_of_service) if pd.notna(place_of_service) else 0,
             'network_indicator': None,
             'service_code': None,
             'total_charges': None,
@@ -114,10 +137,12 @@ def process_chunk(chunk, employer_id_map, active_member_records, client_id, user
         }
         claims_data.append(claim_record)
         med_field_data_list.append({
-            'claim_form_type': getattr(row, 'CLAIM_FORM_TYPE', None),
-            'type_of_bill_code': getattr(row, 'TYPE_OF_BILL_CODE', None)
+            'claim_form_type': med_record.CLAIM_FORM_TYPE,
+            'type_of_bill_code': med_record.TYPE_OF_BILL_CODE
         })
+
     return claims_data, med_field_data_list
+
 
 def insert_data(all_valid_records_df, generated_records, engine, metadata, client_id, user_id, member_records):
     Session = sessionmaker(bind=engine)
@@ -125,6 +150,7 @@ def insert_data(all_valid_records_df, generated_records, engine, metadata, clien
 
     with engine.connect() as conn:
         try:
+            start_time = datetime.datetime.now()
             # Inserting data into tbl_ph_employer_info in batches
             if generated_records:
                 employer_info_data = [{
@@ -160,13 +186,19 @@ def insert_data(all_valid_records_df, generated_records, engine, metadata, clien
                 futures = []
                 for i in range(0, len(all_valid_records_df), bulk_size):
                     chunk = all_valid_records_df.iloc[i:i + bulk_size]
+                    start_chunk_time = datetime.datetime.now()
                     futures.append(executor.submit(process_chunk, chunk, employer_id_map, active_member_records, client_id, user_id))
 
                 for future in as_completed(futures):
                     claims_data, med_field_data_list = future.result()
+                    end_chunk_time = datetime.datetime.now()
+                    print("Time taken for processing chunk:", end_chunk_time - start_chunk_time)
                     if claims_data:
                         claims_df = pd.DataFrame(claims_data)
+                        start_claim_insertion_time = datetime.datetime.now()
                         claims_df.to_sql('tbl_ph_claims', con=engine, if_exists='append', index=False, chunksize=10000)
+                        end_claim_insertion_time = datetime.datetime.now()
+                        print("Time taken for claims insertion:",  end_claim_insertion_time - start_claim_insertion_time)
 
                         # Retrieve the inserted claim IDs
                         last_insert_id_query = "SELECT MAX(id) as id FROM tbl_ph_claims"
@@ -188,8 +220,15 @@ def insert_data(all_valid_records_df, generated_records, engine, metadata, clien
                         if med_field_data:
                             med_field_df = pd.DataFrame(med_field_data).dropna(
                                 subset=['claim_form_type', 'type_of_bill_code'], how='all')
-                            med_field_df.to_sql('tbl_ph_med_field', con=engine, if_exists='append', index=False, chunksize=10000)
+                            start_med_field_insertion_time = datetime.datetime.now()
+                            med_field_df.to_sql('tbl_ph_med_field', con=engine, if_exists='append', index=False,
+                                                chunksize=10000)
+                            end_med_field_insertion_time = datetime.datetime.now()
+                            print("Time taken for med field insertion:",
+                                  end_med_field_insertion_time - start_med_field_insertion_time)
 
+            end_time = datetime.datetime.now()
+            print("Total time taken for data insertion:", end_time - start_time)
             session.commit()
         except Exception as e:
             session.rollback()
