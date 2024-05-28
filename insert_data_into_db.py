@@ -1,17 +1,17 @@
 import datetime
+import multiprocessing
 import numpy as np
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy import create_engine, Table, MetaData
+from sqlalchemy import create_engine, Table, MetaData, text
 import pandas as pd
 from concurrent.futures import ThreadPoolExecutor, as_completed
-
 from constants import connection_string
 
-engine = create_engine(connection_string, pool_size=20, max_overflow=0)  # Enable connection pooling
+engine = create_engine(connection_string, pool_size=20, max_overflow=0)
 metadata = MetaData()
 metadata.reflect(bind=engine)
 
-# Get references to the tables
+
 tbl_ph_claims = metadata.tables['tbl_ph_claims']
 tbl_ph_employer_info = metadata.tables['tbl_ph_employer_info']
 tbl_ph_med_field = metadata.tables['tbl_ph_med_field']
@@ -21,7 +21,6 @@ def process_chunk(chunk, employer_id_map, active_member_records, client_id, user
     claims_data = []
     med_field_data_list = []
 
-    # Retrieve necessary columns outside the loop
     chunk_unique_patient_ids = chunk['UNIQUE_PATIENT_ID'].str.lower()
     chunk_claim_received_dates = chunk['CLAIM_RECEIVED_DATE']
     chunk_claim_entry_dates = chunk['CLAIM_ENTRY_DATE']
@@ -141,7 +140,32 @@ def process_chunk(chunk, employer_id_map, active_member_records, client_id, user
             'type_of_bill_code': med_record.TYPE_OF_BILL_CODE
         })
 
-    return claims_data, med_field_data_list
+    claims_df = pd.DataFrame(claims_data)
+    start_claim_insertion_time = datetime.datetime.now()
+    claims_df.to_sql('tbl_ph_claims', con=engine, if_exists='append', index=False)
+    end_claim_insertion_time = datetime.datetime.now()
+    print("Time taken for claims insertion:", end_claim_insertion_time - start_claim_insertion_time)
+    with engine.connect() as connection:
+        result = connection.execute(text("SELECT LAST_INSERT_ID()"))
+        last_id = result.scalar()
+
+    inserted_claim_ids = list(range(last_id - len(claims_data) + 1, last_id + 1))
+
+    med_field_data = [{
+        'claim_id': claim_id,
+        'client_id': int(client_id),
+        'claim_form_type': med_field['claim_form_type'],
+        'type_of_bill_code': med_field['type_of_bill_code']
+    } for claim_id, med_field in zip(inserted_claim_ids, med_field_data_list)
+        if med_field['claim_form_type'] or med_field['type_of_bill_code']]
+
+    if med_field_data:
+        med_field_df = pd.DataFrame(med_field_data).dropna(
+            subset=['claim_form_type', 'type_of_bill_code'], how='all')
+        start_med_field_insertion_time = datetime.datetime.now()
+        med_field_df.to_sql('tbl_ph_med_field', con=engine, if_exists='append', index=False)
+        end_med_field_insertion_time = datetime.datetime.now()
+        print("Time taken for med field insertion:", end_med_field_insertion_time - start_med_field_insertion_time)
 
 
 def insert_data(all_valid_records_df, generated_records, engine, metadata, client_id, user_id, member_records):
@@ -151,7 +175,7 @@ def insert_data(all_valid_records_df, generated_records, engine, metadata, clien
     with engine.connect() as conn:
         try:
             start_time = datetime.datetime.now()
-            # Inserting data into tbl_ph_employer_info in batches
+            print("Inserting data into tbl_ph_employer_info")
             if generated_records:
                 employer_info_data = [{
                     'client_id': int(record['client_id']),
@@ -165,24 +189,19 @@ def insert_data(all_valid_records_df, generated_records, engine, metadata, clien
                     'updated_at': datetime.datetime.now(),
                     'updated_by': int(record.get('updated_by', 0))
                 } for record in generated_records]
-
                 employer_info_df = pd.DataFrame(employer_info_data)
                 employer_info_df.to_sql('tbl_ph_employer_info', con=engine, if_exists='append', index=False, chunksize=10000)
-
                 # Retrieve the inserted employer IDs
                 inserted_employer_ids_df = pd.read_sql(
                     tbl_ph_employer_info.select().where(tbl_ph_employer_info.c.client_id == int(client_id)),
                     con=engine
                 )
                 employer_id_map = dict(zip(inserted_employer_ids_df['employer_id'], inserted_employer_ids_df['id']))
-
             active_member_records = member_records.get('db_primary_member_records', member_records.get('db_dependents_member_records', {}))
-
-            # Prepare data for tbl_ph_claims
-            bulk_size = 10000
-
-            # Use ThreadPoolExecutor for parallel processing
-            with ThreadPoolExecutor() as executor:
+            print("Inserting data into tbl_ph_employer_info finished")
+            bulk_size = 33000
+            cpu_count = multiprocessing.cpu_count()
+            with ThreadPoolExecutor(max_workers=cpu_count) as executor:
                 futures = []
                 for i in range(0, len(all_valid_records_df), bulk_size):
                     chunk = all_valid_records_df.iloc[i:i + bulk_size]
@@ -190,42 +209,9 @@ def insert_data(all_valid_records_df, generated_records, engine, metadata, clien
                     futures.append(executor.submit(process_chunk, chunk, employer_id_map, active_member_records, client_id, user_id))
 
                 for future in as_completed(futures):
-                    claims_data, med_field_data_list = future.result()
+                    future.result()
                     end_chunk_time = datetime.datetime.now()
                     print("Time taken for processing chunk:", end_chunk_time - start_chunk_time)
-                    if claims_data:
-                        claims_df = pd.DataFrame(claims_data)
-                        start_claim_insertion_time = datetime.datetime.now()
-                        claims_df.to_sql('tbl_ph_claims', con=engine, if_exists='append', index=False, chunksize=10000)
-                        end_claim_insertion_time = datetime.datetime.now()
-                        print("Time taken for claims insertion:",  end_claim_insertion_time - start_claim_insertion_time)
-
-                        # Retrieve the inserted claim IDs
-                        last_insert_id_query = "SELECT MAX(id) as id FROM tbl_ph_claims"
-                        last_inserted_id = pd.read_sql(last_insert_id_query, con=engine).iloc[0]['id']
-                        inserted_claims_df = pd.read_sql(
-                            f"SELECT id FROM tbl_ph_claims WHERE id > {last_inserted_id - len(claims_data)} AND client_id = {int(client_id)}",
-                            con=engine
-                        )
-                        inserted_claims_df = inserted_claims_df['id'].tolist()
-
-                        # Prepare data for tbl_ph_med_field using the inserted claim IDs
-                        med_field_data = [{
-                            'claim_id': claim_id,
-                            'client_id': int(client_id),
-                            'claim_form_type': med_record['claim_form_type'],
-                            'type_of_bill_code': med_record['type_of_bill_code']
-                        } for claim_id, med_record in zip(inserted_claims_df, med_field_data_list) if med_record['claim_form_type'] or med_record['type_of_bill_code']]
-
-                        if med_field_data:
-                            med_field_df = pd.DataFrame(med_field_data).dropna(
-                                subset=['claim_form_type', 'type_of_bill_code'], how='all')
-                            start_med_field_insertion_time = datetime.datetime.now()
-                            med_field_df.to_sql('tbl_ph_med_field', con=engine, if_exists='append', index=False,
-                                                chunksize=10000)
-                            end_med_field_insertion_time = datetime.datetime.now()
-                            print("Time taken for med field insertion:",
-                                  end_med_field_insertion_time - start_med_field_insertion_time)
 
             end_time = datetime.datetime.now()
             print("Total time taken for data insertion:", end_time - start_time)
