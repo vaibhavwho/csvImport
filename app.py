@@ -2,6 +2,8 @@ import os
 import pdb
 import re
 import time
+
+import psutil
 from flask import Flask, request, jsonify, g
 from pathlib import Path
 import pandas as pd
@@ -13,15 +15,44 @@ import concurrent.futures
 from dask import dataframe as dd
 from dask.distributed import Client, LocalCluster
 import dask
-from constants import SERVICE_TYPE
+from constants import SERVICE_TYPE, CLAIM_MEMBER_COLUMNS
 from custom_dataframe_schema import create_schema
-from get_all_member_records import get_all_members_records
+from get_all_member_records import get_all_members_records, set_members_attributes
 from get_info import get_employer_dataframe, get_provider_dataframe
 from get_options import get_lookup_option, get_diagnostic_code_list, get_provider_code_list_upload, \
     get_procedure_code_list, get_benefit_code_list_array, get_place_of_service
 from insert_data_into_db import insert_data, engine, metadata
 from validate_employer_id import validate_employer_id
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+
+def determine_optimal_partitions(df, memory_factor=0.5, rows_per_partition=50000):
+
+    # Get system memory and CPU information
+    total_memory = psutil.virtual_memory().total
+    num_cores = psutil.cpu_count()
+
+    # Estimate the size of the DataFrame in memory
+    df_memory_usage = df.memory_usage(deep=True).sum()
+
+    # Determine available memory to use
+    available_memory = total_memory * memory_factor
+
+    # Estimate the number of partitions
+    partitions_by_memory = available_memory // df_memory_usage
+    partitions_by_cpu = num_cores * 2
+
+    # Ensure partitions by memory is at least 1
+    partitions_by_memory = max(1, partitions_by_memory)
+
+    # Determine final number of partitions based on the rows per partition
+    num_rows = len(df)
+    partitions_by_rows = max(1, num_rows // rows_per_partition)
+
+    # Use the minimum of all computed partitions to avoid over-partitioning
+    optimal_partitions = min(partitions_by_memory, partitions_by_cpu, partitions_by_rows)
+
+    return optimal_partitions
 
 
 def validate_chunk(schema, chunk, start_index):
@@ -223,9 +254,7 @@ def create_app():
             generated_records = []
             error_file_path = f"validation_errors_{time.strftime('%d-%b-%Y_%a-%H:%M:%S')}.csv"
             def process_partition(partition, start_idx):
-                validated_records_df, df_errors, error_records_df, unique_error_row_count = validate_chunk(schema,
-                                                                                                           partition,
-                                                                                                           start_idx)
+                validated_records_df, df_errors, error_records_df, unique_error_row_count = validate_chunk(schema, partition, start_idx)
                 return {'validated_records_df': validated_records_df, 'df_errors': df_errors,
                         'error_records_df': error_records_df, 'unique_error_row_count': unique_error_row_count}
 
@@ -255,6 +284,22 @@ def create_app():
                     }
                     return jsonify(response), 200
 
+            # grouped = all_valid_records_df.groupby('UNIQUE_PATIENT_ID')
+            # all_valid_records_df = grouped.apply(lambda group: set_members_attributes(group, 'medical', CLAIM_MEMBER_COLUMNS))
+            print("Group start")
+            start_group_time = time.time()
+            # optimal_partitions = determine_optimal_partitions(all_valid_records_df)
+            ddf = dd.from_pandas(all_valid_records_df, npartitions=100)
+
+            meta = all_valid_records_df.head(0)
+            meta['SIR_ID'] = ''
+            all_valid_records_df = ddf.groupby('UNIQUE_PATIENT_ID').apply(
+                lambda group: set_members_attributes(group, 'medical', CLAIM_MEMBER_COLUMNS), meta=meta
+            ).compute()
+            end_group_time = time.time() - start_group_time
+            print(f"Total group time taken {end_group_time} seconds")
+            # all_valid_records_df.reset_index(drop=True, inplace=True)
+
             def generate_employer_info():
                 all_valid_records_df_unique = all_valid_records_df.drop_duplicates(subset=['EMPLOYER_ID'])
                 for _, row in all_valid_records_df_unique.iterrows():
@@ -264,7 +309,8 @@ def create_app():
 
             generate_employer_info()
             print(f"Processing finished, time taken {time.time() - processing_start_time}")
-
+            print(all_valid_records_df)
+            pdb.set_trace()
             print("Inserting Data in Database")
             insert_data(all_valid_records_df, generated_records, engine, metadata, client_id, user_id, member_records)
             print(f"Insertion Finished, time taken {time.time() - processing_start_time}")

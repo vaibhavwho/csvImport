@@ -56,3 +56,4 @@ isChronic = 'CHRONIC CONDITIONS'
 isTriggerDiagnosis = 'TRIGGER DIAGNOSIS'
 IN_DB_CONDITION = True
 
+CLAIM_MEMBER_COLUMNS = ['subscriber_type', 'employee_status', 'gender', 'dob', 'state', 'address', 'city', 'zip', 'latitude', 'longitude', 'member_name', 'member_id']
