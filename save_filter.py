@@ -15,7 +15,6 @@ def save_filter_array(filters, parent_type, applied_filters, client_id=None):
     # print("Starting save_filter_array function")
     is_manual = True
     try:
-        # Check if filter count is less than or equal to 20
         if len(filters) <= 20 or not IN_DB_CONDITION:
             # print("Filters count <= 20 or IN_DB_CONDITION is empty, returning filters as string")
             return '"' + '","'.join(filters) + '"'
@@ -94,14 +93,12 @@ def save_filter_array(filters, parent_type, applied_filters, client_id=None):
 
                 # print("Manual deletion completed")
 
-            # Insert the new filters
             # print("Inserting new filters into the database")
             db_session.execute(text(
                 f"INSERT INTO tbl_meta_filter_{parent_type}_values (session_id, filter_type, expire, filter_values) VALUES {filters}"))
             db_session.commit()
             # print("New filters inserted")
 
-            # Return appropriate query based on parent type and filter type
             if parent_type == 'loadData':
                 if filter_type == 'MEDICAL':
                     return f"""

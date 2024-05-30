@@ -1,4 +1,3 @@
-import datetime
 import re
 import pandas as pd
 from sqlalchemy import create_engine, text
@@ -6,7 +5,7 @@ from sqlalchemy.orm import sessionmaker
 from constants import connection_string
 from save_filter import save_filter_array
 
-# Setup database connection
+
 engine = create_engine(connection_string)
 Session = sessionmaker(bind=engine)
 session = Session()
@@ -41,7 +40,8 @@ def get_dependents_member_details(client_id, ssn_list, match_type, enrollment_ty
             ts.zip, 
             ts.latitude, 
             ts.longitude, 
-            ts.state, 
+            ts.state,
+            ts.sir_id, 
             CASE WHEN dependent_gender = 1 THEN 'Male'
                  WHEN dependent_gender = 2 THEN 'Female'
                  ELSE '' END AS gender, 
@@ -92,6 +92,7 @@ def get_primary_member_details(client_id, ssn_list, match_type, enrollment_type_
             latitude, 
             longitude, 
             state, 
+            sir_id,
             'EMPLOYEE' as subscriber_type, 
             CONCAT_WS(' ', employee_first_name, employee_last_name) as member_name 
         FROM 
@@ -148,7 +149,7 @@ def get_all_members_records(client_id, ssn_list, is_claims_import=False):
 
     return {
         'db_dependents_member_records': db_dependents_member_records,
-        'db_primary_member_records': db_primary_member_records
+        'db_primary_member_records': db_primary_member_records,
     }
 
 
@@ -248,9 +249,9 @@ def get_enrollment_status(row, record_type, employee_id):
     global db_enrollment_records
     try:
         if not employee_id or employee_id not in db_enrollment_records:
-            return ''
+            return None
 
-        claim_start_date = row['CLAIM_PAID_DATE'] if record_type == 'pharmacy' else row['PAID_DATE']
+        claim_start_date = row['CLAIM_PAID_DATE'] if record_type == 'medical' else row['PAID_DATE']
         claim_start_date = pd.to_datetime(claim_start_date).date()
 
         for enrollment in db_enrollment_records[employee_id]:
@@ -263,7 +264,7 @@ def get_enrollment_status(row, record_type, employee_id):
     except Exception as e:
         print(f"Error in get_enrollment_status: {e}")
 
-    return ''
+    return None
 
 
 def generate_sir_id(member_records):

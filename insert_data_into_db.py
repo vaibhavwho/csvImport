@@ -6,6 +6,7 @@ from sqlalchemy import create_engine, Table, MetaData, text
 import pandas as pd
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from constants import connection_string
+from get_all_member_records import get_enrollment_status
 
 engine = create_engine(connection_string, pool_size=20, max_overflow=0)
 metadata = MetaData()
@@ -44,6 +45,7 @@ def process_chunk(chunk, employer_id_map, active_member_records, client_id, user
         chunk_medical_records.itertuples(index=False)
     ):
         member_record = active_member_records.get(unique_patient_id)
+        employee_status = get_enrollment_status(row._asdict(), 'medical', unique_patient_id)
         claim_record = {
             'id': None,
             'employer_id': employer_id_map.get(str(row.EMPLOYER_ID)),
@@ -54,10 +56,10 @@ def process_chunk(chunk, employer_id_map, active_member_records, client_id, user
             'subscriber_id': None,
             'patient_ssn': row.PATIENT_SSN,
             'unique_patient_id': row.UNIQUE_PATIENT_ID,
-            'sir_id': None,
+            'sir_id': member_record.get('sir_id') if member_record else None,
             'original_unique_patient_id': member_record.get('original_id') if member_record else None,
             'subscriber_type': member_record.get('subscriber_type') if member_record else None,
-            'employee_status': None,
+            'employee_status': employee_status,
             'gender': member_record.get('gender') if member_record else None,
             'dob': member_record.get('dob') if member_record else None,
             'age': None,
@@ -107,7 +109,7 @@ def process_chunk(chunk, employer_id_map, active_member_records, client_id, user
             'procedure_code': None,
             'ndc_code': None,
             'provider': None,
-            'place_of_service': int(place_of_service) if pd.notna(place_of_service) else 0,
+            'place_of_service': int(place_of_service) if pd.notna(place_of_service) else None,
             'network_indicator': None,
             'service_code': None,
             'total_charges': None,
