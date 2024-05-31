@@ -1,4 +1,5 @@
 import os
+import pdb
 import time
 from flask import Flask, request, jsonify, g
 from pathlib import Path
@@ -146,12 +147,13 @@ def create_app():
             )
 
             members_ids = ddf['UNIQUE_PATIENT_ID'].dropna().astype(str).unique().compute().tolist()
-            provider_ids = ddf['PROVIDER_NPI'].astype(str).unique().compute().tolist()
+            provider_ids = ddf['PROVIDER_NPI'].dropna().astype(str).unique().compute().tolist()
             cpt_procedures = ddf['CPT_PROCEDURE'].dropna().astype(str).unique().compute().tolist()
+            diagnostic_codes = ddf['DIAGNOSIS_1'].dropna().astype(str).unique().compute().tolist()
             employer_df = get_employer_dataframe(client_id)
-            provider_df = get_provider_dataframe()
-            employer_id_list = employer_df['employer_id'].tolist()
-            provider_number_list = provider_df['provider_number'].astype(int).tolist()
+            employer_id_list = employer_df['employer_id'].astype(str).unique().tolist()
+            # provider_df = get_provider_dataframe()
+            # provider_number_list = provider_df['provider_number'].astype(int).tolist()
 
             print("Parallel fetch starting...")
             with ThreadPoolExecutor() as executor:
@@ -159,7 +161,7 @@ def create_app():
                 futures = {
                     executor.submit(get_all_members_records, client_id, members_ids, True): "records",
                     executor.submit(get_lookup_option, [SERVICE_TYPE, 12, 13, 14, 16, 20], True): "lookup_options",
-                    executor.submit(get_diagnostic_code_list): "diagnostic_code_list",
+                    executor.submit(get_diagnostic_code_list, diagnostic_codes, False): "diagnostic_code_list",
                     executor.submit(get_provider_code_list_upload, provider_ids, False): "provider_code_list",
                     executor.submit(get_procedure_code_list, cpt_procedures, False): "procedure_code_list",
                     executor.submit(get_benefit_code_list_array): "benefit_code_list",
@@ -172,6 +174,10 @@ def create_app():
                 print(f"Parallel fetching took {end_parallel_time - start_parallel_time} seconds")
 
             member_records = results["records"]
+            diagnostic_code_dict = results["diagnostic_code_list"]
+            provider_code_dict = results["provider_code_list"]
+            procedure_code_dict = results["procedure_code_list"]
+            place_of_service_dict = results["place_of_service"]
             schema = create_schema(
                 user_id,
                 client_id,
@@ -226,18 +232,20 @@ def create_app():
             def generate_employer_info():
                 all_valid_records_df_unique = all_valid_records_df.drop_duplicates(subset=['EMPLOYER_ID'])
                 for _, row in all_valid_records_df_unique.iterrows():
-                    res = validate_employer_id(row['EMPLOYER_ID'], user_id, client_id, row)
-                    if res['status']:
-                        generated_records.append(res['newRecord'])
+                    if row['EMPLOYER_ID'] not in employer_id_list:
+                        res = validate_employer_id(row['EMPLOYER_ID'], user_id, client_id, row)
+                        if res['status']:
+                            generated_records.append(res['newRecord'])
 
             generate_employer_info()
-
             print(f"Processing finished, time taken {time.time() - processing_start_time}")
             # filtered_valid_records_df = all_valid_records_df[all_valid_records_df['SIR_ID'].notna()]
             # print(filtered_valid_records_df)
             # pdb.set_trace()
             print("Inserting Data in Database")
-            insert_data(all_valid_records_df, generated_records, engine, metadata, client_id, user_id, member_records)
+            insert_data(all_valid_records_df, generated_records, engine, metadata, client_id, user_id, member_records,
+                        provider_code_dict, procedure_code_dict, diagnostic_code_dict,
+                        place_of_service_dict)
             print(f"Insertion Finished, time taken {time.time() - processing_start_time}")
             if all_errors:
                 response = {

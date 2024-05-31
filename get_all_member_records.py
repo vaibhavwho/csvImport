@@ -84,7 +84,8 @@ def get_primary_member_details(client_id, ssn_list, match_type, enrollment_type_
             CASE WHEN gender = 1 THEN 'Male'
                  WHEN gender = 2 THEN 'Female'
                  ELSE '' END AS gender, 
-            dob, 
+            dob,
+            age, 
             address, 
             employee_ssn, 
             city, 
@@ -110,7 +111,7 @@ def get_primary_member_details(client_id, ssn_list, match_type, enrollment_type_
 
     db_primary_member_records.update(indexed_data)
 
-    print(f"Primary member records: {db_primary_member_records}")
+    # print(f"Primary member records: {db_primary_member_records}")
 
     employee_ids = list(indexed_data.keys())
     get_enrollment_details(client_id, employee_ids)

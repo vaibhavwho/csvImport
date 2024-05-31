@@ -1,3 +1,5 @@
+import pdb
+
 import pandas as pd
 from sqlalchemy import create_engine
 from constants import connection_string
@@ -36,7 +38,9 @@ def get_lookup_option(lookup_ids, to_lower=False):
     return get_lookup_option.lookup_options
 
 
-def get_diagnostic_code_list(is_reverse=False):
+def get_diagnostic_code_list(diagnostic_codes, is_reverse=False):
+
+    diagnostic_codes = tuple(diagnostic_codes)
 
     if not hasattr(get_diagnostic_code_list, 'diagnostic_codes'):
         get_diagnostic_code_list.diagnostic_codes = None
@@ -48,16 +52,22 @@ def get_diagnostic_code_list(is_reverse=False):
     if get_diagnostic_code_list.diagnostic_codes is not None:
         return get_diagnostic_code_list.diagnostic_codes
 
+
     condition = ""
     if get_diagnostic_code_list.get_default:
         condition = f"WHERE diagnosis_code = {get_diagnostic_code_list.default_diagnostic_code}"
+    else:
+        formatted_providers = ", ".join(f"'{dcode}'" for dcode in diagnostic_codes)
+        condition = f'WHERE diagnosis_code IN ({formatted_providers})'
 
     # Execute the SQL query
     query = f"SELECT condition_id, diagnosis_code FROM tbl_ph_conditions {condition}"
     data = pd.read_sql_query(query, con=engine)
-
+    data['diagnosis_code'] = data['diagnosis_code'].str.strip()
+    data = data[data['diagnosis_code'] != '']
+    data = data.dropna(subset='diagnosis_code')
     if not data.empty:
-        if is_reverse:
+        if not is_reverse:
             diagnostic_codes = dict(zip(data['condition_id'], data['diagnosis_code']))
         else:
             diagnostic_codes = dict(zip(data['diagnosis_code'], data['condition_id']))
@@ -77,7 +87,6 @@ def get_provider_code_list_upload(provider_ids, is_reverse=False):
         get_provider_code_list_upload.provider_codes = None
 
     if get_provider_code_list_upload.provider_codes is not None:
-        # print("Returning cached provider codes")
         return get_provider_code_list_upload.provider_codes
 
     condition = ""
@@ -93,10 +102,8 @@ def get_provider_code_list_upload(provider_ids, is_reverse=False):
 
     # print(f"SQL Query Condition: {condition}")
     query = f"SELECT provider_id, provider_number FROM tbl_ph_providers {condition}"
-    # print(f"SQL Query: {query}")
-
     data = pd.read_sql_query(query, con=engine)
-    # print(f"Query Result: {data}")
+    data = data.dropna(subset='provider_number')
 
     if not data.empty:
         if is_reverse:
@@ -108,7 +115,6 @@ def get_provider_code_list_upload(provider_ids, is_reverse=False):
     else:
         get_provider_code_list_upload.provider_codes = {}
 
-    # print(f"Provider Codes: {get_provider_code_list_upload.provider_codes}")
     return get_provider_code_list_upload.provider_codes
 
 
@@ -136,7 +142,9 @@ def get_procedure_code_list(cpt_procedures, is_reverse=False):
         formatted_procedures = ", ".join(f"'{proc}'" for proc in cpt_procedures)
         query += f" WHERE procedure_code IN ({formatted_procedures})"
     data = pd.read_sql_query(query, con=engine)
-
+    data['procedure_code'] = data['procedure_code'].str.strip()
+    data = data[data['procedure_code'] != '']
+    data = data.dropna(subset='procedure_code')
     if not data.empty:
         if is_reverse:
             procedure_codes = dict(zip(data['procedure_code'], data['procedure_id']))
@@ -170,7 +178,7 @@ def get_place_of_service(is_reverse=False):
         data = pd.read_sql_query(sql, con=engine)
 
         if not data.empty:
-            if is_reverse:
+            if not is_reverse:
                 place_of_service = dict(zip(data['place_of_service_id'], data['place_of_service_code']))
             else:
                 place_of_service = dict(zip(data['place_of_service_code'], data['place_of_service_id']))

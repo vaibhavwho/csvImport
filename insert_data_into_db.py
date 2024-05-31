@@ -1,5 +1,7 @@
 import datetime
 import multiprocessing
+import pdb
+
 import numpy as np
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine, Table, MetaData, text
@@ -18,7 +20,8 @@ tbl_ph_employer_info = metadata.tables['tbl_ph_employer_info']
 tbl_ph_med_field = metadata.tables['tbl_ph_med_field']
 
 
-def process_chunk(chunk, employer_id_map, active_member_records, client_id, user_id):
+def process_chunk(chunk, employer_id_map, active_member_records, client_id, user_id,
+                  provider_code_list, procedure_code_list, diagnostic_code_list, place_of_service_dict):
     claims_data = []
     med_field_data_list = []
 
@@ -34,7 +37,7 @@ def process_chunk(chunk, employer_id_map, active_member_records, client_id, user
 
     for unique_patient_id, row, claim_received_date, claim_entry_date, place_of_service, diagnosis_2, diagnosis_3, diagnosis_4, diagnosis_5, med_record in zip(
         chunk_unique_patient_ids,
-        chunk.itertuples(index=False),
+        chunk.itertuples(index=False, name='Row'),
         chunk_claim_received_dates,
         chunk_claim_entry_dates,
         chunk_place_of_services,
@@ -42,10 +45,22 @@ def process_chunk(chunk, employer_id_map, active_member_records, client_id, user
         chunk_diagnosis_3,
         chunk_diagnosis_4,
         chunk_diagnosis_5,
-        chunk_medical_records.itertuples(index=False)
+        chunk_medical_records.itertuples(index=False, name='MedRecord')
     ):
         member_record = active_member_records.get(unique_patient_id)
         employee_status = get_enrollment_status(row._asdict(), 'medical', unique_patient_id)
+        provider_npi = row.PROVIDER_NPI
+        provider_code = provider_code_list.get(provider_npi)
+
+        cpt_procedure = row.CPT_PROCEDURE
+        procedure_code = procedure_code_list.get(cpt_procedure)
+
+        diagnosis_1 = row.DIAGNOSIS_1
+        diagnostic_code = diagnostic_code_list.get(diagnosis_1)
+
+        place_of_service_code = int(place_of_service) if pd.notna(place_of_service) else None
+        place_of_service_value = place_of_service_dict.get(place_of_service_code)
+
         claim_record = {
             'id': None,
             'employer_id': employer_id_map.get(str(row.EMPLOYER_ID)),
@@ -62,7 +77,7 @@ def process_chunk(chunk, employer_id_map, active_member_records, client_id, user
             'employee_status': employee_status,
             'gender': member_record.get('gender') if member_record else None,
             'dob': member_record.get('dob') if member_record else None,
-            'age': None,
+            'age': member_record.get('age') if member_record else None,
             'state': member_record.get('state') if member_record else None,
             'address': member_record.get('address') if member_record else None,
             'city': member_record.get('city') if member_record else None,
@@ -71,70 +86,70 @@ def process_chunk(chunk, employer_id_map, active_member_records, client_id, user
             'longitude': member_record.get('longitude') if member_record else None,
             'member_name': member_record.get('member_name') if member_record else None,
             'member_id': member_record.get('member_id') if member_record else None,
-            'inpatient_or_outpatient': getattr(row, 'INPATIENT_OR_OUTPATIENT', None),
-            'claim_cause': getattr(row, 'CLAIM_CAUSE', None),
-            'benefit_code': getattr(row, 'BENEFIT_CODE', None),
-            'network': getattr(row, 'NETWORK', None),
-            'provider_name': getattr(row, 'PROVIDER_NAME', None),
-            'provider_paid_name': getattr(row, 'PROVIDER_PAID_NAME', None),
-            'ucr': getattr(row, 'UCR', None),
-            'cpt_modifier': getattr(row, 'CPT_MODIFIER', None),
+            'inpatient_or_outpatient': row.INPATIENT_OR_OUTPATIENT,
+            'claim_cause': row.CLAIM_CAUSE,
+            'benefit_code': row.BENEFIT_CODE,
+            'network': row.NETWORK,
+            'provider_name': row.PROVIDER_NAME,
+            'provider_paid_name': row.PROVIDER_PAID_NAME,
+            'ucr': row.UCR,
+            'cpt_modifier': row.CPT_MODIFIER,
             'diagnosis_2': diagnosis_2 if pd.notna(diagnosis_2) else '00000000',
             'diagnosis_3': diagnosis_3 if pd.notna(diagnosis_3) else '00000000',
             'diagnosis_4': diagnosis_4 if pd.notna(diagnosis_4) else '00000000',
             'diagnosis_5': diagnosis_5 if pd.notna(diagnosis_5) else '00000000',
-            'member_deductible_amount': getattr(row, 'MEMBER_DEDUCTIBLE_AMOUNT', None),
-            'member_oop_amount': getattr(row, 'MEMBER_OOP_AMOUNT', None),
-            'member_copay_amount': getattr(row, 'MEMBER_COPAY_AMOUNT', None),
-            'claim_number': getattr(row, 'CLAIM_NUMBER', None),
+            'member_deductible_amount': row.MEMBER_DEDUCTIBLE_AMOUNT,
+            'member_oop_amount': row.MEMBER_OOP_AMOUNT,
+            'member_copay_amount': row.MEMBER_COPAY_AMOUNT,
+            'claim_number': row.CLAIM_NUMBER,
             'claim_received_date': claim_received_date,
             'claim_entry_date': claim_entry_date,
-            'adjuster': None,
-            'document_number': None,
-            'sequence': None,
-            'check_number': getattr(row, 'CHECK_NUMBER', None),
-            'benefits_assigned': getattr(row, 'BENEFITS_ASSIGNED', None),
-            'revenue_code': getattr(row, 'REVENUE_CODE', None),
-            'provider_ein': getattr(row, 'PROVIDER_EIN', None),
-            'provider_paid_npi': getattr(row, 'PROVIDER_PAID_NPI', None),
-            'provider_paid_zip': getattr(row, 'PROVIDER_PAID_ZIP', None),
-            'original_diagnosis_code': getattr(row, 'ORIGINAL_DIAGNOSIS_CODE', None),
-            'original_provider_code': getattr(row, 'ORIGINAL_PROVIDER_CODE', None),
-            'original_procedure_code': getattr(row, 'ORIGINAL_PROCEDURE_CODE', None),
-            'original_pos_code': getattr(row, 'ORIGINAL_POS_CODE', None),
+            'adjuster': row.REMARKS_CODE_1,
+            'document_number': row.REMARKS_CODE_2,
+            'sequence': row.REMARKS_CODE_3,
+            'check_number': row.CHECK_NUMBER,
+            'benefits_assigned': row.BENEFITS_ASSIGNED,
+            'revenue_code': row.REVENUE_CODE,
+            'provider_ein': row.PROVIDER_EIN,
+            'provider_paid_npi': row.PROVIDER_PAID_NAME,
+            'provider_paid_zip': row.PROVIDER_PAID_ZIP,
+            'original_diagnosis_code': row.ORIGINAL_DIAGNOSIS_CODE,
+            'original_provider_code': row.ORIGINAL_PROVIDER_CODE,
+            'original_procedure_code': row.ORIGINAL_PROCEDURE_CODE,
+            'original_pos_code': row.ORIGINAL_POS_CODE,
             'service_type': None,
-            'service_date': None,
-            'service_date_to': None,
-            'diagnostic_code': None,
-            'procedure_code': None,
+            'service_date': row.SERVICE_START_DATE,
+            'service_date_to': row.SERVICE_END_DATE,
+            'diagnostic_code': diagnostic_code,
+            'procedure_code': procedure_code,
             'ndc_code': None,
-            'provider': None,
-            'place_of_service': int(place_of_service) if pd.notna(place_of_service) else None,
+            'provider': provider_code,
+            'place_of_service': place_of_service_value,
             'network_indicator': None,
             'service_code': None,
-            'total_charges': None,
+            'total_charges': row.CHARGED_AMOUNT,
             'amount_allowed': None,
-            'total_paid': None,
+            'total_paid': row.COVERED_AMOUNT,
             'access_fee': None,
-            'paid_date': None,
-            'plan_paid_amount': getattr(row, 'PLAN_PAID_AMOUNT', None),
+            'paid_date': row.CLAIM_PAID_DATE,
+            'plan_paid_amount': row.PLAN_PAID_AMOUNT,
             'is_preventive': None,
             'facility_name': None,
             'provider_type': None,
-            'location_code': getattr(row, 'LOCATION_CODE', None),
-            'sub_group_code': getattr(row, 'SUB_GROUP_CODE', None),
-            'plan_code': getattr(row, 'PLAN_CODE', None),
+            'location_code': row.LOCATION_CODE,
+            'sub_group_code': row.SUB_GROUP_CODE,
+            'plan_code': row.PLAN_CODE,
             'created_at': datetime.datetime.now(),
             'created_by': int(user_id),
             'updated_at': datetime.datetime.now(),
             'updated_by': int(user_id),
-            'admit_date': getattr(row, 'ADMIT_DATE', None),
-            'discharge_date': getattr(row, 'DISCHARGE_DATE', None),
-            'admission_days': getattr(row, 'ADMISSION_DAYS', None),
-            'discharge_status_code': getattr(row, 'DISCHARGE_STATUS_CODE', None),
-            'point_of_origin_code': getattr(row, 'POINT_OF_ORIGIN_CODE', None),
-            'admission_diagnosis_code': getattr(row, 'ADMISSION_DIAGNOSIS_CODE', None),
-            'patient_reason_diagnosis_code': getattr(row, 'PATIENT_REASON_DIAGNOSIS_CODE', None),
+            'admit_date': row.ADMIT_DATE,
+            'discharge_date': row.DISCHARGE_DATE,
+            'admission_days': row.ADMISSION_DAYS,
+            'discharge_status_code': row.DISCHARGE_STATUS_CODE,
+            'point_of_origin_code': row.POINT_OF_ORIGIN_CODE,
+            'admission_diagnosis_code': row.ADMISSION_DIAGNOSIS_CODE,
+            'patient_reason_diagnosis_code': row.PATIENT_REASON_DIAGNOSIS_CODE,
         }
         claims_data.append(claim_record)
         med_field_data_list.append({
@@ -143,37 +158,50 @@ def process_chunk(chunk, employer_id_map, active_member_records, client_id, user
         })
 
     claims_df = pd.DataFrame(claims_data)
-    start_claim_insertion_time = datetime.datetime.now()
-    claims_df.to_sql('tbl_ph_claims', con=engine, if_exists='append', index=False)
-    end_claim_insertion_time = datetime.datetime.now()
-    print("Time taken for claims insertion:", end_claim_insertion_time - start_claim_insertion_time)
     with engine.connect() as connection:
-        result = connection.execute(text("SELECT LAST_INSERT_ID()"))
-        last_id = result.scalar()
+        transaction = connection.begin()
+        try:
+            claims_df.to_sql('tbl_ph_claims', con=connection, if_exists='append', index=False)
 
-    inserted_claim_ids = list(range(last_id - len(claims_data) + 1, last_id + 1))
+            inserted_claim_ids = connection.execute(
+                text("""
+                    SELECT id FROM tbl_ph_claims 
+                    WHERE created_by = :user_id 
+                    AND client_id = :client_id 
+                    ORDER BY created_at DESC 
+                    LIMIT :count
+                """),
+                {'user_id': user_id, 'client_id': client_id, 'count': len(claims_data)}
+            ).fetchall()
 
-    med_field_data = [{
-        'claim_id': claim_id,
-        'client_id': int(client_id),
-        'claim_form_type': med_field['claim_form_type'],
-        'type_of_bill_code': med_field['type_of_bill_code']
-    } for claim_id, med_field in zip(inserted_claim_ids, med_field_data_list)
-        if med_field['claim_form_type'] or med_field['type_of_bill_code']]
+            inserted_claim_ids = [row[0] for row in inserted_claim_ids][::-1]
 
-    if med_field_data:
-        med_field_df = pd.DataFrame(med_field_data).dropna(
-            subset=['claim_form_type', 'type_of_bill_code'], how='all')
-        start_med_field_insertion_time = datetime.datetime.now()
-        med_field_df.to_sql('tbl_ph_med_field', con=engine, if_exists='append', index=False)
-        end_med_field_insertion_time = datetime.datetime.now()
-        print("Time taken for med field insertion:", end_med_field_insertion_time - start_med_field_insertion_time)
+            if len(inserted_claim_ids) != len(claims_data):
+                raise ValueError("Mismatch between inserted claims and claims data")
 
+            med_field_data = [{
+                'claim_id': claim_id,
+                'client_id': int(client_id),
+                'claim_form_type': med_field['claim_form_type'],
+                'type_of_bill_code': med_field['type_of_bill_code']
+            } for claim_id, med_field in zip(inserted_claim_ids, med_field_data_list)
+                if med_field['claim_form_type'] or med_field['type_of_bill_code']]
 
-def insert_data(all_valid_records_df, generated_records, engine, metadata, client_id, user_id, member_records):
+            if med_field_data:
+                med_field_df = pd.DataFrame(med_field_data).dropna(
+                    subset=['claim_form_type', 'type_of_bill_code'], how='all')
+                med_field_df.to_sql('tbl_ph_med_field', con=connection, if_exists='append', index=False)
+
+            transaction.commit()
+        except Exception as e:
+            transaction.rollback()
+            print("Error occurred during data insertion:", e)
+            raise
+
+def insert_data(all_valid_records_df, generated_records, engine, metadata, client_id, user_id, member_records,
+                provider_code_list, procedure_code_list, diagnostic_code_list, place_of_service):
     Session = sessionmaker(bind=engine)
     session = Session()
-
     with engine.connect() as conn:
         try:
             start_time = datetime.datetime.now()
@@ -208,7 +236,9 @@ def insert_data(all_valid_records_df, generated_records, engine, metadata, clien
                 for i in range(0, len(all_valid_records_df), bulk_size):
                     chunk = all_valid_records_df.iloc[i:i + bulk_size]
                     start_chunk_time = datetime.datetime.now()
-                    futures.append(executor.submit(process_chunk, chunk, employer_id_map, active_member_records, client_id, user_id))
+                    futures.append(
+                        executor.submit(process_chunk, chunk, employer_id_map, active_member_records, client_id, user_id,
+                                        provider_code_list, procedure_code_list, diagnostic_code_list, place_of_service))
 
                 for future in as_completed(futures):
                     future.result()
@@ -223,3 +253,4 @@ def insert_data(all_valid_records_df, generated_records, engine, metadata, clien
             print("Error occurred during data insertion:", e)
         finally:
             session.close()
+

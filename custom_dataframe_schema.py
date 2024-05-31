@@ -1,3 +1,4 @@
+import pdb
 import re
 import pandas as pd
 import pandera as pa
@@ -43,11 +44,11 @@ def create_schema(user_id, client_id, records, lookup_options, diagnostic_code_l
             "SERVICE_END_DATE": Column(pa.String, checks=[pa.Check(check_date_format, element_wise=False)], nullable=True),
             "PROVIDER_NPI": Column(pa.String, checks=[pa.Check.str_matches(r'^[a-zA-Z0-9_]+$'), pa.Check.isin(list(provider_code_list.values()))], nullable=True),
             # "PROVIDER_NPI": Column(pa.String, checks=[pa.Check.str_matches(r'^[a-zA-Z0-9_]+$')], nullable=True),
-            "PLACE_OF_SERVICE": Column(pa.String, checks=[pa.Check.str_matches(r'^\d+$'), pa.Check.isin(list(place_of_service.keys()))], nullable=True),
+            "PLACE_OF_SERVICE": Column(pa.String, checks=[pa.Check.str_matches(r'^\d+$'), pa.Check.isin(list(place_of_service.values()))], nullable=True),
             # "PLACE_OF_SERVICE": Column(pa.String, checks=[pa.Check.str_matches(r'^[a-zA-Z0-9_]+$')], nullable=True),
             "CPT_PROCEDURE": Column(pa.String, checks=[pa.Check.isin(list(procedure_code_list.values()))], nullable=True),
             # "CPT_PROCEDURE": Column(pa.String, checks=[pa.Check.str_matches(r'^[a-zA-Z0-9_]+$')], nullable=True),
-            "DIAGNOSIS_1": Column(pa.String, checks=[pa.Check.str_matches(r'^[a-zA-Z0-9_]+$')], nullable=True),
+            "DIAGNOSIS_1": Column(pa.String, checks=[pa.Check.isin(list(diagnostic_code_list.values()))], nullable=True),
             "CLAIM_PAID_DATE": Column(pa.String, checks=[pa.Check(check_date_format, element_wise=False)], nullable=False),
             "COVERED_AMOUNT": Column(pa.String, checks=[pa.Check.str_matches(r'^-?(\d+(\.\d*)?|\.\d+)$')], nullable=True),
             "PLAN_PAID_AMOUNT": Column(pa.String, checks=[pa.Check.str_matches(r'^-?(\d+(\.\d*)?|\.\d+)$')], nullable=False),
@@ -78,7 +79,7 @@ def create_schema(user_id, client_id, records, lookup_options, diagnostic_code_l
             "BENEFITS_ASSIGNED": Column(pa.String, checks=[pa.Check.isin(list(BENEFIT_ASSIGNED.keys()))], nullable=True),
             "REVENUE_CODE": Column(pa.String, checks=[pa.Check.str_matches(r'^[a-zA-Z0-9_]+$')], nullable=True),
             "PROVIDER_EIN": Column(pa.String, checks=[pa.Check.str_matches(r'^[a-zA-Z0-9_]+$')], nullable=True),
-            "PROVIDER_PAID_NPI": Column(pa.String, checks=[pa.Check.isin(list(provider_code_list.values()))], nullable=True),
+            "PROVIDER_PAID_NPI": Column(pa.String, checks=[pa.Check.str_matches(r'^[a-zA-Z0-9_]+$')], nullable=True),
             # "PROVIDER_PAID_NPI": Column(pa.String, checks=[pa.Check.str_matches(r'^[a-zA-Z0-9_]+$')], nullable=True),
             "PROVIDER_PAID_ZIP": Column(pa.String, checks=[pa.Check.str_matches(r'^[a-zA-Z0-9_]+$')], nullable=True),
             "UNIQUE_PATIENT_ID": Column(pa.String, checks=[pa.Check.str_matches(r'^[a-zA-Z0-9_-]+$')], nullable=False),
